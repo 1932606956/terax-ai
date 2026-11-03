@@ -139,14 +139,15 @@ export function AgentsSection() {
             }
           >
             <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={1.75} />
-            New snippet
+            {t("ag.newSnippet")}
           </Button>
         </div>
 
         {snippets.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/60 bg-card/30 px-4 py-6 text-center text-[11px] text-muted-foreground">
-            No snippets yet. Create one and insert it with{" "}
-            <code className="font-mono">#handle</code> in the AI input.
+            {t("ag.noSnippetsPrefix")}
+            <code className="font-mono">#handle</code>
+            {t("ag.noSnippetsSuffix")}
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -504,7 +505,7 @@ function SnippetEditorDialog({
             <Textarea
               value={draft.content}
               onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-              placeholder="Inserted into the prompt as a <snippet> block when you use #handle."
+              placeholder={t("ag.contentPlaceholder")}
               className="min-h-40 resize-y font-mono text-[11.5px] leading-relaxed"
             />
           </div>
@@ -536,7 +537,7 @@ function CustomInstructionsBlock({ value }: { value: string }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label>Custom instructions</Label>
+        <Label>{t("ag.customInstructions")}</Label>
         {/* {savedTick > 0 ? (
           <span className="text-[10px] text-muted-foreground">Saved</span>
         ) : null} */}

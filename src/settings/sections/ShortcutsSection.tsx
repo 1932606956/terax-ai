@@ -113,7 +113,7 @@ export function ShortcutsSection() {
           return (
             <div key={group} className="flex flex-col gap-3">
               <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                {group}
+                {t(`sc.group.${group.toLowerCase()}`)}
               </h3>
               <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
                 {items.map((s) => (
@@ -211,7 +211,7 @@ function ShortcutRow({
                 </KbdGroup>
               ) : (
                 <span className="text-[11px] text-muted-foreground italic">
-                  Unassigned
+                  {t("sc.unassigned")}
                 </span>
               )}
             </div>

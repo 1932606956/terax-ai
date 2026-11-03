@@ -73,7 +73,7 @@ describe("createCommandItems", () => {
   });
 
   it("disables close on the last tab with a single pane", () => {
-    expect(reasonById({}, "tab.close")).toBe("最后一个标签页");
+    expect(reasonById({}, "tab.close")).toBe("已是最后一个标签页");
   });
 
   it("enables close when more than one tab is open", () => {

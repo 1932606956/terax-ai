@@ -75,8 +75,8 @@ import {
 } from "@/modules/spaces";
 import { StatusBar } from "@/modules/statusbar";
 import {
-  TabSwitcherHud,
   type CloseTabsPlan,
+  TabSwitcherHud,
   useTabSwitcher,
   useTabs,
   useWindowTitle,
@@ -99,9 +99,9 @@ import {
   whenSessionReady,
   writeToSession,
 } from "@/modules/terminal";
-import type { TerminalSearchController } from "@/modules/terminal/search/TerminalSearchController";
 import { bindTerminalWindowFocus } from "@/modules/terminal/ghostty/renderScheduling";
 import { subscribeWindowPresentation } from "@/modules/terminal/ghostty/windowPresentation";
+import type { TerminalSearchController } from "@/modules/terminal/search/TerminalSearchController";
 import {
   LivePageResizeBridge,
   ThemeProvider,
@@ -134,12 +134,12 @@ import {
   WorkspaceInputBar,
 } from "./components/WorkspaceInputBar";
 import { WorkspaceSurface } from "./components/WorkspaceSurface";
-import { useAppCloseGuard } from "./hooks/useAppCloseGuard";
 import {
   hasOpenPathTab,
   renamedPath,
   spacesEmptiedByTabs,
 } from "./hooks/tabCloseGuards";
+import { useAppCloseGuard } from "./hooks/useAppCloseGuard";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
 
@@ -174,7 +174,6 @@ export default function App() {
     newPreviewTab,
     newMarkdownTab,
     setMarkdownView,
-    setOverrideLanguage,
     openAiDiffTab,
     closeAiDiffTab,
     openGitDiffTab,
@@ -1442,7 +1441,6 @@ export default function App() {
               spaceSwitcher={spaceSwitcher}
               searchTarget={searchTarget}
               searchRef={searchInlineRef}
-              onOverrideLanguage={setOverrideLanguage}
             />
           )}
 

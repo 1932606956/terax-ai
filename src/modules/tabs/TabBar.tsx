@@ -1,4 +1,3 @@
-import { t as tr } from "@/i18n/zh";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -6,22 +5,12 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import {} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { t as tr } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
-import {
-  ALL_LANGUAGES,
-  EXPOSED_LANGUAGES,
-} from "@/modules/editor/lib/languageDefinitions";
-import { resolveDisplayName } from "@/modules/editor/lib/languageResolver";
 import { FileIcon } from "@/modules/explorer/FileIcon";
 import {
   leafIds,
@@ -40,7 +29,6 @@ import {
   IncognitoIcon,
   Message02Icon,
   PencilEdit02Icon,
-  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -54,7 +42,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { selectTabAgentStatus } from "./lib/tabAgentStatus";
 import { labelFor } from "./lib/tabLabel";
-import type { EditorTab, Tab, TerminalTab } from "./lib/useTabs";
+import type { Tab, TerminalTab } from "./lib/useTabs";
 import { NewTabMenu } from "./NewTabMenu";
 
 type Props = {
@@ -79,7 +67,6 @@ type Props = {
   onRename: (id: number, title: string) => void;
   /** Move a dragged tab to a new position (insertion gap index 0..tabs.length). */
   onReorder: (fromId: number, toGapIndex: number) => void;
-  onOverrideLanguage?: (id: number, lang: string | null) => void;
   compact?: boolean;
 };
 
@@ -100,7 +87,6 @@ export function TabBar({
   onPin,
   onRename,
   onReorder,
-  onOverrideLanguage,
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -108,7 +94,6 @@ export function TabBar({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dropGap, setDropGap] = useState<number | null>(null);
-  const [showAllLanguages, setShowAllLanguages] = useState(false);
   const drag = useRef<{
     pointerId: number;
     startX: number;
@@ -365,106 +350,7 @@ export function TabBar({
                       compact ? "max-w-48" : "max-w-80",
                     )}
                   >
-                    {t.kind === "editor" ? (
-                      <DropdownMenu
-                        onOpenChange={(open) => {
-                          if (!open) setShowAllLanguages(false);
-                        }}
-                      >
-                        <DropdownMenuTrigger asChild>
-                          {/* span, not button: a button nested in the TabsTrigger button is invalid DOM and breaks WebKit focus. */}
-                          <span
-                            role="button"
-                            tabIndex={-1}
-                            data-no-drag
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm p-1 -m-1 transition-all hover:bg-accent hover:text-accent-foreground hover:ring-1 hover:ring-primary/30 hover:shadow-[0_0_4px_var(--color-popover-foreground)]"
-                          >
-                            <TabIcon tab={t} />
-                          </span>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="start"
-                          side="bottom"
-                          sideOffset={6}
-                          alignOffset={-4}
-                          className="max-h-75 w-48 overflow-y-auto rounded-xl border border-border/40 bg-popover p-1 shadow-lg"
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onPointerUp={(e) => e.stopPropagation()}
-                        >
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              onOverrideLanguage?.(t.id, null);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-default focus:bg-accent focus:text-accent-foreground"
-                          >
-                            <FileIcon
-                              name={t.title}
-                              className="size-3.5 shrink-0 object-contain"
-                            />
-                            <div className="flex flex-1 flex-col">
-                              <span>{tr("tabs.autoDetect")}</span>
-                              <span className="text-[10px] text-muted-foreground italic">
-                                {tr("tabs.mode")}: {resolveDisplayName(t.title)}
-                              </span>
-                            </div>
-                            {!(t as EditorTab).overrideLanguage && (
-                              <HugeiconsIcon
-                                icon={Tick02Icon}
-                                className="size-3.5 text-primary"
-                              />
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setShowAllLanguages((v) => !v);
-                            }}
-                            className="w-full px-2.5 py-1.5 text-left text-xs text-primary/60 hover:text-primary rounded-lg transition-colors hover:bg-accent"
-                          >
-                            {showAllLanguages
-                              ? tr("tabs.fewerLanguages")
-                              : tr("tabs.allLanguages")}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="my-1 border-t border-border/30" />
-                          {(showAllLanguages
-                            ? ALL_LANGUAGES
-                            : EXPOSED_LANGUAGES
-                          ).map((lang) => {
-                            const isSelected =
-                              (t as EditorTab).overrideLanguage === lang.ext;
-                            return (
-                              <DropdownMenuItem
-                                key={lang.ext}
-                                onSelect={() =>
-                                  onOverrideLanguage?.(t.id, lang.ext)
-                                }
-                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-default focus:bg-accent focus:text-accent-foreground"
-                              >
-                                <FileIcon
-                                  name={`dummy.${lang.ext}`}
-                                  className="size-3.5 shrink-0 object-contain"
-                                />
-                                <span className="flex-1">{lang.name}</span>
-                                {isSelected && (
-                                  <HugeiconsIcon
-                                    icon={Tick02Icon}
-                                    className="size-3.5 text-primary"
-                                  />
-                                )}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <TabIcon tab={t} />
-                    )}
+                    <TabIcon tab={t} />
                     {/* Preview tabs use italic to signal the transient state,
                         matching the visual convention from VSCode. */}
                     <span className={cn("truncate", isPreview && "italic")}>

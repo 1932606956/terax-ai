@@ -185,13 +185,15 @@ const zh: Record<string, string> = {
   "gen.showHiddenDesc":
     "在文件资源管理器和搜索中包含点开头的文件与文件夹（.env、.gitignore、.config）。",
   "gen.gitDecorations": "Git 装饰",
-  "gen.gitDecorationsDesc": "在文件资源管理器中为已更改文件着色，并淡化已列入 .gitignore 的条目。",
+  "gen.gitDecorationsDesc":
+    "在文件资源管理器中为已更改文件着色，并淡化已列入 .gitignore 的条目。",
   "gen.terminal": "终端",
   "gen.renderer": "终端渲染器",
   "gen.rendererDesc":
     "自动模式使用 WebGPU 并以 WebGL 兜底。显卡不兼容时选 WebGL。仅对新终端生效。",
   "gen.screenReader": "屏幕阅读器支持",
-  "gen.screenReaderDesc": "将终端输出转换为可供屏幕阅读器读取的文本。输出区域获得焦点时可用 Page Up / Page Down 浏览历史。",
+  "gen.screenReaderDesc":
+    "将终端输出转换为可供屏幕阅读器读取的文本。输出区域获得焦点时可用 Page Up / Page Down 浏览历史。",
   "gen.cursorBlink": "光标闪烁",
   "gen.cursorBlinkDesc":
     "终端光标闪烁。默认关闭以降低空闲 CPU 占用，与 VS Code 和 macOS 终端一致。",
@@ -212,9 +214,11 @@ const zh: Record<string, string> = {
     "集成终端使用的 Shell。WSL 空间使用发行版登录 Shell。已有标签页保持原 Shell。",
   "gen.shellDesc": "新终端标签页使用的 Shell。已有标签页保持原 Shell。",
   "gen.workspace": "工作区环境",
-  "gen.workspaceDesc": "新空间（终端与 AI 助手均适用）的运行位置：Windows 或 WSL 发行版。已有空间保持不变，可随时从状态栏切换。",
+  "gen.workspaceDesc":
+    "新空间（终端与 AI 助手均适用）的运行位置：Windows 或 WSL 发行版。已有空间保持不变，可随时从状态栏切换。",
   "gen.letterSpacing": "字距",
-  "gen.letterSpacingDesc": "字符间的额外水平间距（像素）。使用 Nerd Font 时可用负值收紧间距。",
+  "gen.letterSpacingDesc":
+    "字符间的额外水平间距（像素）。使用 Nerd Font 时可用负值收紧间距。",
   "gen.fontSize": "字号",
   "gen.fontSizeDesc": "终端文字大小。",
   "gen.scrollback": "回滚行数",
@@ -320,7 +324,8 @@ const zh: Record<string, string> = {
   "th.mica": "Mica 背景",
   "th.vibrancy": "窗口毛玻璃",
   "th.micaDesc": "将标题栏、状态栏与侧栏融入桌面壁纸。仅 Windows 11。",
-  "th.vibrancyDesc": "标题栏、状态栏与侧栏对窗口后方内容做毛玻璃效果，面板保持实色。",
+  "th.vibrancyDesc":
+    "标题栏、状态栏与侧栏对窗口后方内容做毛玻璃效果，面板保持实色。",
   "th.theme": "主题",
   "th.editorTheme": "编辑器主题",
   "th.background": "背景",
@@ -338,6 +343,34 @@ const zh: Record<string, string> = {
   "ab.installVersion": "安装 v{n}",
   "ab.updateVersion": "更新到 v{n}",
   "ab.checkForUpdates": "检查更新",
+  // settings: shortcuts groups + states
+  "sc.unassigned": "未设置",
+  "sc.group.general": "常规",
+  "sc.group.tabs": "标签页",
+  "sc.group.panes": "窗格",
+  "sc.group.terminal": "终端",
+  "sc.group.view": "视图",
+  "sc.group.search": "搜索",
+  "sc.group.ai": "AI",
+  "sc.group.editor": "编辑器",
+
+  // settings: agents leftovers
+  "ag.noSnippetsPrefix": "还没有片段。创建一个后可在 AI 输入框中用 ",
+  "ag.noSnippetsSuffix": " 插入。",
+  "ag.contentPlaceholder": "使用 #句柄 时会作为 <snippet> 块插入提示词。",
+  // lsp settings
+  "lsp.copyCommand": "复制安装命令",
+  "lsp.servers": "语言服务器",
+  "lsp.detectAgain": "重新检测",
+  "lsp.removeServer": "移除服务器",
+
+  // models card leftovers
+  "models.removeProvider": "移除接口",
+  "models.replaceKey": "更换密钥",
+  "models.removeKey": "移除密钥",
+  "models.removeEndpoint": "移除接口",
+  "models.namePlaceholder": "我的接口",
+  "models.keyPlaceholder": "可选 - 免认证接口可留空",
 };
 
 export const dictionary: Readonly<Record<string, string>> = zh;

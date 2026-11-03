@@ -20,9 +20,9 @@ import {
 } from "@/modules/terminal/lib/panes";
 import { disposeSession } from "@/modules/terminal/lib/terminalSessionApi";
 import {
+  type SetStateAction,
   useCallback,
   useEffect,
-  type SetStateAction,
   useRef,
   useState,
 } from "react";
@@ -1031,21 +1031,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     [setActiveId, setTabs],
   );
 
-  const setOverrideLanguage = useCallback(
-    (id: number, lang: string | null) => {
-      setTabs((curr) =>
-        curr.map((t) => {
-          if (t.id !== id || t.kind !== "editor") return t;
-          return {
-            ...t,
-            overrideLanguage: lang,
-          };
-        }),
-      );
-    },
-    [setTabs],
-  );
-
   const setMarkdownView = useCallback(
     (id: number, mode: "rendered" | "raw") => {
       setTabs((curr) =>
@@ -1499,7 +1484,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     removeTabsForSpace,
     markBooted,
     setActiveSpaceForNewTabs,
-    setOverrideLanguage,
     newTab,
     newBlockTab,
     newAgentTab,

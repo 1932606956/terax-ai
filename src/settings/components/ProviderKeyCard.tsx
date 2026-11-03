@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { t } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import type { ProviderInfo } from "@/modules/ai/config";
 import {
@@ -105,7 +106,7 @@ export function ProviderKeyCard({
             size="icon"
             variant="ghost"
             onClick={onRemove}
-            title="Remove provider"
+            title={t("models.removeProvider")}
             className="size-7 text-muted-foreground hover:text-destructive"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.75} />
@@ -186,7 +187,7 @@ export function ProviderKeyCard({
             size="icon"
             variant="ghost"
             onClick={() => setEditing(true)}
-            title="Replace"
+            title={t("models.replaceKey")}
             className="size-7"
           >
             <HugeiconsIcon icon={Edit02Icon} size={12} strokeWidth={1.75} />
@@ -196,7 +197,7 @@ export function ProviderKeyCard({
               size="icon"
               variant="ghost"
               onClick={() => void onClear()}
-              title="Remove"
+              title={t("models.removeKey")}
               className="size-7 text-muted-foreground hover:text-destructive"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.75} />

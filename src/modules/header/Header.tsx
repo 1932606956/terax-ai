@@ -1,6 +1,6 @@
-import { t } from "@/i18n/zh";
 import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/components/WindowControls";
+import { t } from "@/i18n/zh";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
@@ -47,7 +47,6 @@ type Props = {
   onRename: (id: number, title: string) => void;
   /** Move a dragged tab to a new position (insertion gap index). */
   onReorder: (fromId: number, toGapIndex: number) => void;
-  onOverrideLanguage?: (id: number, lang: string | null) => void;
   onToggleSidebar: () => void;
   onOpenCommandPalette: () => void;
   onActivateAgent: (tabId: number, leafId: number) => void;
@@ -77,7 +76,6 @@ export function Header({
   onPin,
   onRename,
   onReorder,
-  onOverrideLanguage,
   onToggleSidebar,
   onOpenCommandPalette,
   onActivateAgent,
@@ -186,7 +184,6 @@ export function Header({
           onPin={onPin}
           onRename={onRename}
           onReorder={onReorder}
-          onOverrideLanguage={onOverrideLanguage}
           compact={compact}
         />
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />

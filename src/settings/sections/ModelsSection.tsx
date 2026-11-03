@@ -363,7 +363,7 @@ function CustomEndpointCard({
             e.stopPropagation();
             onRemove();
           }}
-          title="Remove endpoint"
+          title={t("models.removeEndpoint")}
           className="ml-auto size-7 text-muted-foreground hover:text-destructive"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.75} />
@@ -380,7 +380,7 @@ function CustomEndpointCard({
                 const v = nameDraft.trim();
                 if (v !== endpoint.name) void onUpdate({ name: v });
               }}
-              placeholder="My endpoint"
+              placeholder={t("models.namePlaceholder")}
               spellCheck={false}
               className="h-8 flex-1 text-[11.5px]"
             />
@@ -456,7 +456,7 @@ function CustomEndpointCard({
                   size="icon"
                   variant="ghost"
                   onClick={() => void onClearKey()}
-                  title="Remove key"
+                  title={t("models.removeKey")}
                   className="size-7 text-muted-foreground hover:text-destructive"
                 >
                   <HugeiconsIcon
@@ -472,7 +472,7 @@ function CustomEndpointCard({
                   type="password"
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
-                  placeholder="Optional — leave empty for unauthenticated endpoints"
+                  placeholder={t("models.keyPlaceholder")}
                   spellCheck={false}
                   className="h-8 flex-1 font-mono text-[11.5px]"
                 />
