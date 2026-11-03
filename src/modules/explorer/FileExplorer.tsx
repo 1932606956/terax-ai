@@ -7,6 +7,14 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { t } from "@/i18n/zh";
+import { IS_MAC } from "@/lib/platform";
+import { cn } from "@/lib/utils";
+import type { GitStatusSnapshot } from "@/modules/ai/lib/native";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useGlobalShortcuts } from "@/modules/shortcuts";
+import type { TerminalPathDropTarget } from "@/modules/terminal";
+import { useWorkspaceEnvStore } from "@/modules/workspace";
 import {
   FileAddIcon,
   Folder01Icon,
@@ -27,40 +35,33 @@ import {
   useRef,
   useState,
 } from "react";
-import { IS_MAC } from "@/lib/platform";
-import { cn } from "@/lib/utils";
 import { ExplorerSearch, type ExplorerSearchHandle } from "./ExplorerSearch";
-import {
-  EntryRow,
-  PendingRow,
-  StatusRow,
-  type RowActions,
-  type SelectModifiers,
-} from "./TreeRow";
+import { FileIcon, FolderIcon } from "./FileIcon";
 import { InlineInput } from "./InlineInput";
+import {
+  isPasteShortcut,
+  parentDir as parentOf,
+  pasteClipboardFiles,
+  pasteTargetDir,
+} from "./lib/clipboardPaste";
 import {
   copyToClipboard,
   relativePath,
   revealInFinder,
 } from "./lib/contextActions";
-import { FileIcon, FolderIcon } from "./FileIcon";
-import {
-  isPasteShortcut,
-  pasteClipboardFiles,
-  pasteTargetDir,
-  parentDir as parentOf,
-} from "./lib/clipboardPaste";
-import { useWorkspaceEnvStore } from "@/modules/workspace";
+import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerDnd } from "./lib/useExplorerDnd";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { useFileTree } from "./lib/useFileTree";
 import { useGitStatus } from "./lib/useGitStatus";
-import type { GitStatusCode } from "./lib/gitStatusUtils";
-import { useGlobalShortcuts } from "@/modules/shortcuts";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { GitStatusSnapshot } from "@/modules/ai/lib/native";
-import type { TerminalPathDropTarget } from "@/modules/terminal";
+import {
+  EntryRow,
+  PendingRow,
+  type RowActions,
+  type SelectModifiers,
+  StatusRow,
+} from "./TreeRow";
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -878,8 +879,8 @@ export const FileExplorer = memo(
                   }}
                 >
                   {deleteConfirm
-                    ? "Click again to confirm"
-                    : `Delete ${selectedPaths.size} items`}
+                    ? t("ctx.confirmDelete")
+                    : t("ctx.deleteNItems", String(selectedPaths.size))}
                 </ContextMenuItem>
               ) : menuTarget ? (
                 <>
@@ -888,7 +889,7 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onOpenFile(menuTarget.path, true)}
                     >
-                      Open
+                      {t("ctx.open")}
                     </ContextMenuItem>
                   )}
                   {menuTarget.isDir && onRevealInTerminal && (
@@ -896,7 +897,7 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onRevealInTerminal(menuTarget.path)}
                     >
-                      Open in Terminal
+                      {t("ctx.openInTerminal")}
                     </ContextMenuItem>
                   )}
                   {menuTarget.isDir && onOpenInSourceControl && (
@@ -904,7 +905,7 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onOpenInSourceControl(menuTarget.path)}
                     >
-                      Open in Source Control
+                      {t("ctx.openInScm")}
                     </ContextMenuItem>
                   )}
                   {menuTarget.isDir && onOpenGitHistory && (
@@ -912,14 +913,14 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onOpenGitHistory(menuTarget.path)}
                     >
-                      Open Git History
+                      {t("ctx.openGitHistory")}
                     </ContextMenuItem>
                   )}
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => void revealInFinder(menuTarget.path)}
                   >
-                    Reveal in Finder
+                    {t("ctx.reveal")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
@@ -933,7 +934,7 @@ export const FileExplorer = memo(
                       )
                     }
                   >
-                    New File
+                    {t("ctx.newFile")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
@@ -946,7 +947,7 @@ export const FileExplorer = memo(
                       )
                     }
                   >
-                    New Folder
+                    {t("ctx.newFolder")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
@@ -958,7 +959,7 @@ export const FileExplorer = memo(
                       )
                     }
                   >
-                    Paste
+                    {t("ctx.paste")}
                     <ContextMenuShortcut>{PASTE_HINT}</ContextMenuShortcut>
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -966,7 +967,7 @@ export const FileExplorer = memo(
                     className={COMPACT_ITEM}
                     onSelect={() => void copyToClipboard(menuTarget.path)}
                   >
-                    Copy Path
+                    {t("ctx.copyPath")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
@@ -976,14 +977,14 @@ export const FileExplorer = memo(
                       )
                     }
                   >
-                    Copy Relative Path
+                    {t("ctx.copyRelPath")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => onAttachToAgent?.(menuTarget.path)}
                   >
-                    Attach to Agent
+                    {t("ctx.attachToAgent")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
@@ -1000,7 +1001,7 @@ export const FileExplorer = memo(
                       }
                     }}
                   >
-                    {deleteConfirm ? "Click again to confirm" : "Delete"}
+                    {deleteConfirm ? t("ctx.confirmDelete") : "Delete"}
                   </ContextMenuItem>
                 </>
               ) : (
@@ -1010,7 +1011,7 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onRevealInTerminal(rootPath)}
                     >
-                      Open in Terminal
+                      {t("ctx.openInTerminal")}
                     </ContextMenuItem>
                   )}
                   {onOpenInSourceControl && (
@@ -1018,7 +1019,7 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onOpenInSourceControl(rootPath)}
                     >
-                      Open in Source Control
+                      {t("ctx.openInScm")}
                     </ContextMenuItem>
                   )}
                   {onOpenGitHistory && (
@@ -1026,33 +1027,33 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onOpenGitHistory(rootPath)}
                     >
-                      Open Git History
+                      {t("ctx.openGitHistory")}
                     </ContextMenuItem>
                   )}
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => void revealInFinder(rootPath)}
                   >
-                    Reveal in Finder
+                    {t("ctx.reveal")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.beginCreate(rootPath, "file")}
                   >
-                    New File
+                    {t("ctx.newFile")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.beginCreate(rootPath, "dir")}
                   >
-                    New Folder
+                    {t("ctx.newFolder")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => void pasteInto(rootPath)}
                   >
-                    Paste
+                    {t("ctx.paste")}
                     <ContextMenuShortcut>{PASTE_HINT}</ContextMenuShortcut>
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -1060,13 +1061,13 @@ export const FileExplorer = memo(
                     className={COMPACT_ITEM}
                     onSelect={() => void copyToClipboard(rootPath)}
                   >
-                    Copy Path
+                    {t("ctx.copyPath")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.refresh(rootPath)}
                   >
-                    Refresh
+                    {t("ctx.refresh")}
                   </ContextMenuItem>
                 </>
               )}

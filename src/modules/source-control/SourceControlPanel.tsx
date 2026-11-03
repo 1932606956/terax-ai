@@ -27,7 +27,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
-import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -35,14 +34,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { t } from "@/i18n/zh";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { type GitBranchEntry, native } from "@/modules/ai/lib/native";
+import { FileIcon } from "@/modules/explorer/FileIcon";
 import {
   copyToClipboard,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
-import { FileIcon } from "@/modules/explorer/FileIcon";
 import {
   COMPACT_CONTENT,
   COMPACT_ITEM,
@@ -67,24 +67,25 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  type KeyboardEvent,
   memo,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
-  type ReactNode,
 } from "react";
+import { toast } from "sonner";
 import {
   repositoryTargetIsPending,
   type SourceControlRepositoryTarget,
 } from "./repositoryTarget";
 import type { SourceControlSummary } from "./useSourceControl";
 import {
-  useSourceControlPanel,
   type CheckState,
   type SourceControlFileEntry,
+  useSourceControlPanel,
 } from "./useSourceControlPanel";
 
 type Props = {
@@ -436,14 +437,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const commitDisabledReason = scm.actionBusy
     ? "Wait for the current Git action to finish."
     : scm.stagedEntries.length === 0
-      ? "Stage changes to enable commit."
+      ? t("scm.stageToCommit")
       : scm.commitMessage.trim().length === 0
-        ? "Enter a commit message to enable commit."
+        ? t("scm.enterMessage")
         : null;
   const commitHint = canCommit
     ? `Commit with ${commitShortcut}.`
     : (commitDisabledReason ?? `Commit with ${commitShortcut}.`);
-  const pushHint = scm.pushHint ?? "Push is unavailable right now.";
+  const pushHint = scm.pushHint ?? t("scm.pushUnavailable");
   const pushDisabledReason = fixedTargetPending
     ? "Wait for the selected repository to finish loading."
     : scm.actionBusy
@@ -729,7 +730,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <IconActionButton
-              label={fetchBusy ? "Fetching…" : "Fetch from remote"}
+              label={fetchBusy ? t("scm.fetching") : t("scm.fetch")}
               disabled={!canFetch}
               onClick={handleFetch}
               side="bottom"
@@ -747,7 +748,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             <IconActionButton
               label={
                 pullBusy
-                  ? "Pulling…"
+                  ? t("scm.pulling")
                   : isDiverged
                     ? "Branch diverged — resolve in terminal"
                     : !hasUpstream
@@ -771,7 +772,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               )}
             </IconActionButton>
             <IconActionButton
-              label="Refresh source control"
+              label={t("scm.refresh")}
               disabled={isRefreshing || !!scm.actionBusy}
               onClick={handleRefresh}
               side="bottom"
@@ -851,7 +852,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   value={scm.commitMessage}
                   onChange={(event) => scm.setCommitMessage(event.target.value)}
                   onKeyDown={handleCommitShortcut}
-                  placeholder="Commit message"
+                  placeholder={t("scm.commitPlaceholder")}
                   rows={3}
                   className={cn(
                     "min-h-[72px] border-border resize-none rounded-lg bg-transparent px-3 pb-7 pt-2.5 text-[12.5px] leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus:border-0",
@@ -917,7 +918,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <span className="truncate font-medium text-foreground/85">
                   {stagedCount === 0
-                    ? "Nothing staged"
+                    ? t("scm.nothingStaged")
                     : `${stagedCount} ${stagedCount === 1 ? "file" : "files"} staged`}
                 </span>
                 <span className="ml-auto shrink-0 truncate text-muted-foreground/65">
@@ -934,7 +935,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       disabled={!canCommit}
                       onClick={() => void scm.commit()}
                     >
-                      {scm.actionBusy === "commit" ? "Committing…" : "Commit"}
+                      {scm.actionBusy === "commit"
+                        ? t("scm.committing")
+                        : t("scm.commit")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -958,7 +961,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       }
                       onClick={() => void scm.push()}
                     >
-                      {scm.actionBusy === "push" ? "Pushing…" : "Push"}
+                      {scm.actionBusy === "push"
+                        ? t("scm.pushing")
+                        : t("scm.push")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -1179,7 +1184,7 @@ function ListHeader({
       <label className="ml-auto flex shrink-0 cursor-pointer select-none items-center gap-1.5 text-[10.5px] font-medium text-muted-foreground hover:text-foreground">
         <span>All</span>
         <Checkbox
-          aria-label="Stage all changes"
+          aria-label={t("scm.stageAll")}
           checked={checkboxValue(headerCheckState)}
           disabled={actionBusy !== null}
           onCheckedChange={() => void onToggleAll()}
@@ -1219,7 +1224,7 @@ const EntryRow = memo(function EntryRow({
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
     : null;
   const isDeleted = entry.statusCode === "D";
-  const revealLabel = IS_MAC ? "Reveal in Finder" : "Reveal in File Manager";
+  const revealLabel = t("ctx.reveal");
 
   return (
     <ContextMenu>
@@ -1325,14 +1330,14 @@ const EntryRow = memo(function EntryRow({
             void onSelectFile(entry);
           }}
         >
-          Open Diff
+          {t("ctx.openDiff")}
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
             onSelect={() => onOpenFile(absolutePath)}
           >
-            Open File
+            {t("ctx.openFile")}
           </ContextMenuItem>
         ) : null}
 
@@ -1344,7 +1349,7 @@ const EntryRow = memo(function EntryRow({
           disabled={disabled}
           onSelect={() => void onToggleStageFile(entry)}
         >
-          {entry.checkState === "checked" ? "Unstage" : "Stage"}
+          {entry.checkState === "checked" ? t("scm.unstage") : t("scm.stage")}
         </ContextMenuItem>
         {entry.unstaged ? (
           <ContextMenuItem
@@ -1353,7 +1358,7 @@ const EntryRow = memo(function EntryRow({
             disabled={disabled}
             onSelect={() => onDiscardFile(entry)}
           >
-            Discard Changes
+            {t("scm.discardChanges")}
           </ContextMenuItem>
         ) : null}
 
@@ -1364,14 +1369,14 @@ const EntryRow = memo(function EntryRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
         >
-          Copy Relative Path
+          {t("ctx.copyRelPath")}
         </ContextMenuItem>
         {absolutePath ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
-            Copy Absolute Path
+            {t("scm.copyAbsPath")}
           </ContextMenuItem>
         ) : null}
 
