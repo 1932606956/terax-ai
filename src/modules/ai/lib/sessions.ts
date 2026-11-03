@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import type { UIMessage } from "@ai-sdk/react";
 import { invoke } from "@tauri-apps/api/core";
 import { LazyStore } from "@tauri-apps/plugin-store";
@@ -119,9 +120,9 @@ function migrateMessages(): Promise<void> {
       console.warn("Could not finalize the chat history migration:", error);
     }
     if (failed.length > 0) {
-      toast.warning("Some chat history could not be migrated", {
+      toast.warning(t("toast.migrateFailed"), {
         id: "conversation-migration",
-        description: `${failed.length} conversation${failed.length === 1 ? "" : "s"} will be retried next launch.`,
+        description: t("toast.migrateFailedDesc", String(failed.length)),
       });
     }
   })().catch((error) => {
@@ -161,7 +162,7 @@ async function execute(id: string, op: WriteOp): Promise<void> {
 
 function reportFailure(id: string, error: unknown) {
   notices.add(id);
-  toast.error("Could not save conversation", {
+  toast.error(t("toast.saveConvFailed"), {
     id: `conversation-save:${id}`,
     duration: Number.POSITIVE_INFINITY,
     description: String(error),
@@ -241,9 +242,9 @@ export async function loadMessages(id: string): Promise<UIMessage[] | null> {
     });
   } catch (error) {
     if (!String(error).includes("corrupt:")) throw error;
-    toast.error("A conversation file was damaged", {
+    toast.error(t("toast.convDamaged"), {
       id: `conversation-damaged:${id}`,
-      description: "It was set aside and the conversation starts empty.",
+      description: t("toast.convDamagedDesc"),
     });
     return null;
   }

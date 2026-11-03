@@ -1,5 +1,6 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WindowControls } from "@/components/WindowControls";
+import { t } from "@/i18n/zh";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -32,38 +33,43 @@ const TABS: {
 }[] = [
   {
     id: "general",
-    label: "General",
+    label: t("settings.general"),
     icon: Settings01Icon,
     component: GeneralSection,
   },
   {
     id: "editor",
-    label: "Editor",
+    label: t("settings.editor"),
     icon: SourceCodeIcon,
     component: EditorSection,
   },
   {
     id: "themes",
-    label: "Themes",
+    label: t("settings.themes"),
     icon: PaintBoardIcon,
     component: ThemesSection,
   },
   {
     id: "shortcuts",
-    label: "Shortcuts",
+    label: t("settings.shortcuts"),
     icon: KeyboardIcon,
     component: ShortcutsSection,
   },
-  { id: "models", label: "Models", icon: AiScanIcon, component: ModelsSection },
+  {
+    id: "models",
+    label: t("settings.models"),
+    icon: AiScanIcon,
+    component: ModelsSection,
+  },
   {
     id: "agents",
-    label: "Agents",
+    label: t("settings.agents"),
     icon: UserMultiple02Icon,
     component: AgentsSection,
   },
   {
     id: "about",
-    label: "About",
+    label: t("settings.about"),
     icon: InformationCircleIcon,
     component: AboutSection,
   },

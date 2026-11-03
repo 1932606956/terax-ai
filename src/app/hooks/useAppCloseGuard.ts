@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { toast } from "sonner";
 import { flushPersist } from "@/modules/ai/store/chatStore";
 import {
@@ -65,7 +66,7 @@ export function useAppCloseGuard(tabsRef: RefObject<Tab[]>) {
       await getCurrentWindow().close();
     } catch (error) {
       forceClose.current = false;
-      toast.error("Could not close the window", {
+      toast.error(t("toast.closeWindowFailed"), {
         description: String(error),
       });
     }
@@ -80,7 +81,7 @@ export function useAppCloseGuard(tabsRef: RefObject<Tab[]>) {
       });
       if (closeAfterFlush(flush, warned.current) === "warn") {
         warned.current = true;
-        toast.error("Could not save chat history", {
+        toast.error(t("toast.saveChatFailed"), {
           id: "close-save-failed",
           duration: Number.POSITIVE_INFINITY,
           description: flush.timedOut

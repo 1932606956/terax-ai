@@ -1,3 +1,4 @@
+import { t as tr } from "@/i18n/zh";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -407,9 +408,9 @@ export function TabBar({
                               className="size-3.5 shrink-0 object-contain"
                             />
                             <div className="flex flex-1 flex-col">
-                              <span>Auto Detect</span>
+                              <span>{tr("tabs.autoDetect")}</span>
                               <span className="text-[10px] text-muted-foreground italic">
-                                Mode: {resolveDisplayName(t.title)}
+                                {tr("tabs.mode")}: {resolveDisplayName(t.title)}
                               </span>
                             </div>
                             {!(t as EditorTab).overrideLanguage && (
@@ -427,8 +428,8 @@ export function TabBar({
                             className="w-full px-2.5 py-1.5 text-left text-xs text-primary/60 hover:text-primary rounded-lg transition-colors hover:bg-accent"
                           >
                             {showAllLanguages
-                              ? "↑ Fewer languages"
-                              : "↓ All languages"}
+                              ? tr("tabs.fewerLanguages")
+                              : tr("tabs.allLanguages")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="my-1 border-t border-border/30" />
                           {(showAllLanguages
@@ -471,7 +472,7 @@ export function TabBar({
                     </span>
                     {t.kind === "editor" && t.dirty ? (
                       <span
-                        aria-label="Unsaved changes"
+                        aria-label={tr("tabs.unsavedChanges")}
                         className="size-1.5 shrink-0 rounded-full bg-foreground/70"
                       />
                     ) : null}
@@ -479,7 +480,7 @@ export function TabBar({
                   {tabs.length > 1 && (
                     <span
                       role="button"
-                      aria-label="Close tab"
+                      aria-label={tr("tabs.closeTab")}
                       data-no-drag
                       onPointerDown={(e) => {
                         e.preventDefault();
@@ -525,7 +526,7 @@ export function TabBar({
                             size={13}
                             strokeWidth={1.75}
                           />
-                          <span className="flex-1">Rename</span>
+                          <span className="flex-1">{tr("tabs.rename")}</span>
                         </ContextMenuItem>
                         {tabs.length > 1 && (
                           <>
@@ -539,7 +540,7 @@ export function TabBar({
                                 size={13}
                                 strokeWidth={1.75}
                               />
-                              <span className="flex-1">Close</span>
+                              <span className="flex-1">{tr("tabs.close")}</span>
                             </ContextMenuItem>
                           </>
                         )}
@@ -555,7 +556,7 @@ export function TabBar({
                         size={13}
                         strokeWidth={1.75}
                       />
-                      <span className="flex-1">Close tabs to the right</span>
+                      <span className="flex-1">{tr("tabs.closeRight")}</span>
                     </ContextMenuItem>
                     <ContextMenuItem
                       className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
@@ -567,7 +568,7 @@ export function TabBar({
                         size={13}
                         strokeWidth={1.75}
                       />
-                      <span className="flex-1">Close other tabs</span>
+                      <span className="flex-1">{tr("tabs.closeOthers")}</span>
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
@@ -774,7 +775,7 @@ function TabRenameInput({
     <input
       ref={ref}
       defaultValue={initial}
-      aria-label="Rename tab"
+      aria-label={tr("tabs.renameTab")}
       className={cn(
         "w-28 min-w-0 rounded-sm bg-background px-1 text-xs text-foreground",
         "outline-none ring-1 ring-border focus:ring-ring",

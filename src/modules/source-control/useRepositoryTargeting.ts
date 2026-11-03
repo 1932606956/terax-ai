@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { native } from "@/modules/ai/lib/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -57,7 +58,7 @@ export function useRepositoryTargeting({
           return null;
         }
         if (!repo) {
-          toast.info("No Git repository contains this folder.");
+          toast.info(t("toast.noGitRepo"));
         }
         return repo;
       } catch (error) {
@@ -65,7 +66,7 @@ export function useRepositoryTargeting({
           requestId === requestRef.current &&
           isContextCurrent(spaceId, workspaceKey)
         ) {
-          toast.error("Could not resolve Git repository", {
+          toast.error(t("toast.resolveGitFailed"), {
             description: String(error),
           });
         }

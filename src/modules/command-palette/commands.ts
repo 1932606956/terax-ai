@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import type { SearchTarget } from "@/modules/header";
 import { MAX_PANES_PER_TAB, type Tab } from "@/modules/tabs";
 import { leafIds } from "@/modules/terminal";
@@ -23,14 +24,14 @@ import {
 import type { PaletteItem } from "./types";
 
 export const COMMAND_GROUPS = [
-  "General",
-  "Spaces",
-  "Tabs",
-  "Panes",
-  "Git",
-  "Search",
-  "View",
-  "AI",
+  t("palette.group.general"),
+  t("palette.group.spaces"),
+  t("palette.group.tabs"),
+  t("palette.group.panes"),
+  t("palette.group.git"),
+  t("palette.group.search"),
+  t("palette.group.view"),
+  t("palette.group.ai"),
 ] as const;
 
 export type CommandPaletteActionContext = {
@@ -77,18 +78,18 @@ export function createCommandItems(
   const onlyOneTab = ctx.tabs.length < 2;
   const noWorkspaceRoot = !ctx.explorerRoot && !ctx.home;
   const splitDisabled = !activeTerminalTab
-    ? "No terminal tab"
+    ? t("palette.reason.noTerminalTab")
     : activePaneCount >= MAX_PANES_PER_TAB
-      ? "Pane limit"
+      ? t("palette.reason.paneLimit")
       : undefined;
   const closeDisabled =
-    onlyOneTab && activePaneCount < 2 ? "Last tab" : undefined;
+    onlyOneTab && activePaneCount < 2 ? t("palette.reason.lastTab") : undefined;
 
   return [
     {
       id: "settings.open",
-      title: "Open settings",
-      group: "General",
+      title: t("palette.openSettings"),
+      group: t("palette.group.general"),
       keywords: ["preferences", "config"],
       icon: Settings01Icon,
       shortcutId: "settings.open",
@@ -96,50 +97,59 @@ export function createCommandItems(
     },
     {
       id: "theme.pick",
-      title: "Change theme...",
-      group: "General",
+      title: t("palette.changeTheme"),
+      group: t("palette.group.general"),
       keywords: ["theme", "appearance", "color", "dark", "light"],
       icon: PaintBoardIcon,
       run: noop,
     },
     {
       id: "shortcuts.open",
-      title: "Keyboard shortcuts",
-      group: "General",
+      title: t("palette.keyboardShortcuts"),
+      group: t("palette.group.general"),
       keywords: ["keys", "keybindings", "settings"],
       icon: KeyboardIcon,
       run: ctx.openKeyboardShortcuts,
     },
     {
       id: "spaces.overview",
-      title: "Spaces: Overview",
-      group: "Spaces",
-      keywords: ["spaces", "sessions", "overview", "organize", "manage", "move"],
+      title: t("palette.spacesOverview"),
+      group: t("palette.group.spaces"),
+      keywords: [
+        "spaces",
+        "sessions",
+        "overview",
+        "organize",
+        "manage",
+        "move",
+      ],
       icon: DashboardSquare01Icon,
       run: ctx.openSpacesOverview,
     },
     {
       id: "spaces.new",
-      title: "New Space",
-      group: "Spaces",
+      title: t("palette.newSpace"),
+      group: t("palette.group.spaces"),
       keywords: ["space", "session", "workspace", "group", "create"],
       icon: DashboardSquare01Icon,
       run: ctx.newSpace,
     },
     ...ctx.spaces.map((sp) => ({
       id: `spaces.switch.${sp.id}`,
-      title: `Switch to ${sp.name}`,
-      group: "Spaces" as const,
+      title: `${t("palette.switchTo")} ${sp.name}`,
+      group: t("palette.group.spaces"),
       keywords: ["space", "switch", "session", sp.name],
       icon: DashboardSquare01Icon,
       disabledReason:
-        sp.id === ctx.activeSpaceId ? "Current space" : undefined,
+        sp.id === ctx.activeSpaceId
+          ? t("palette.reason.currentSpace")
+          : undefined,
       run: () => ctx.switchSpace(sp.id),
     })),
     {
       id: "tab.new",
-      title: "New terminal",
-      group: "Tabs",
+      title: t("palette.newTerminal"),
+      group: t("palette.group.tabs"),
       keywords: ["shell", "terminal", "new tab"],
       icon: TerminalIcon,
       shortcutId: "tab.new",
@@ -147,16 +157,16 @@ export function createCommandItems(
     },
     {
       id: "tab.newBlock",
-      title: "New block terminal",
-      group: "Tabs",
+      title: t("palette.newBlockTerminal"),
+      group: t("palette.group.tabs"),
       keywords: ["blocks", "warp", "command blocks", "terminal"],
       icon: DashboardSquare01Icon,
       run: ctx.openNewBlock,
     },
     {
       id: "tab.newPrivate",
-      title: "New private terminal",
-      group: "Tabs",
+      title: t("palette.newPrivateTerminal"),
+      group: t("palette.group.tabs"),
       keywords: ["privacy", "private", "incognito", "hidden from ai"],
       icon: IncognitoIcon,
       shortcutId: "tab.newPrivate",
@@ -164,18 +174,20 @@ export function createCommandItems(
     },
     {
       id: "tab.newEditor",
-      title: "New editor tab",
-      group: "Tabs",
+      title: t("palette.newEditorTab"),
+      group: t("palette.group.tabs"),
       keywords: ["file", "editor", "create"],
       icon: FileEditIcon,
       shortcutId: "tab.newEditor",
-      disabledReason: noWorkspaceRoot ? "No workspace root" : undefined,
+      disabledReason: noWorkspaceRoot
+        ? t("palette.reason.noWorkspaceRoot")
+        : undefined,
       run: ctx.openNewEditor,
     },
     {
       id: "tab.newPreview",
-      title: "New web preview",
-      group: "Tabs",
+      title: t("palette.newWebPreview"),
+      group: t("palette.group.tabs"),
       keywords: ["browser", "web", "localhost", "preview"],
       icon: Globe02Icon,
       shortcutId: "tab.newPreview",
@@ -183,8 +195,8 @@ export function createCommandItems(
     },
     {
       id: "tab.close",
-      title: "Close tab or pane",
-      group: "Tabs",
+      title: t("palette.closeTabOrPane"),
+      group: t("palette.group.tabs"),
       keywords: ["close", "remove", "pane"],
       icon: Cancel01Icon,
       shortcutId: "tab.close",
@@ -193,8 +205,8 @@ export function createCommandItems(
     },
     {
       id: "pane.splitRight",
-      title: "Split pane right",
-      group: "Panes",
+      title: t("palette.splitPaneRight"),
+      group: t("palette.group.panes"),
       keywords: ["terminal", "pane", "split", "right", "column"],
       icon: LayoutTwoColumnIcon,
       shortcutId: "pane.splitRight",
@@ -203,8 +215,8 @@ export function createCommandItems(
     },
     {
       id: "pane.splitDown",
-      title: "Split pane down",
-      group: "Panes",
+      title: t("palette.splitPaneDown"),
+      group: t("palette.group.panes"),
       keywords: ["terminal", "pane", "split", "down", "row"],
       icon: LayoutTwoRowIcon,
       shortcutId: "pane.splitDown",
@@ -213,16 +225,16 @@ export function createCommandItems(
     },
     {
       id: "git.graph",
-      title: "Open git graph",
-      group: "Git",
+      title: t("palette.openGitGraph"),
+      group: t("palette.group.git"),
       keywords: ["git", "graph", "history", "log", "commits"],
       icon: SourceCodeIcon,
       run: ctx.openGitGraph,
     },
     {
       id: "git.source",
-      title: "Toggle source control",
-      group: "Git",
+      title: t("palette.toggleSourceControl"),
+      group: t("palette.group.git"),
       keywords: ["git", "source control", "changes", "staging", "diff"],
       icon: SourceCodeIcon,
       shortcutId: "pane.source",
@@ -230,8 +242,8 @@ export function createCommandItems(
     },
     {
       id: "search.content",
-      title: "Find content in files",
-      group: "Search",
+      title: t("palette.findContentInFiles"),
+      group: t("palette.group.search"),
       keywords: ["grep", "ripgrep", "text", "contents", "search in files"],
       icon: FileSearchIcon,
       trailing: "#",
@@ -239,8 +251,8 @@ export function createCommandItems(
     },
     {
       id: "history.open",
-      title: "Search command history",
-      group: "Search",
+      title: t("palette.searchCommandHistory"),
+      group: t("palette.group.search"),
       keywords: ["history", "shell", "rerun", "previous commands"],
       icon: TerminalIcon,
       trailing: ">",
@@ -248,28 +260,32 @@ export function createCommandItems(
     },
     {
       id: "search.focus",
-      title: "Find in current tab",
-      group: "Search",
+      title: t("palette.findInCurrentTab"),
+      group: t("palette.group.search"),
       keywords: ["find", "terminal", "editor", "current"],
       icon: Search01Icon,
       shortcutId: "search.focus",
-      disabledReason: ctx.searchTarget ? undefined : "No searchable view",
+      disabledReason: ctx.searchTarget
+        ? undefined
+        : t("palette.reason.noSearchableView"),
       run: ctx.focusSearch,
     },
     {
       id: "explorer.search",
-      title: "Search files by name",
-      group: "Search",
+      title: t("palette.searchFilesByName"),
+      group: t("palette.group.search"),
       keywords: ["explorer", "workspace", "file", "open"],
       icon: Search01Icon,
       shortcutId: "explorer.search",
-      disabledReason: ctx.explorerRoot ? undefined : "No workspace root",
+      disabledReason: ctx.explorerRoot
+        ? undefined
+        : t("palette.reason.noWorkspaceRoot"),
       run: ctx.focusExplorerSearch,
     },
     {
       id: "sidebar.toggle",
-      title: "Toggle file explorer",
-      group: "View",
+      title: t("palette.toggleFileExplorer"),
+      group: t("palette.group.view"),
       keywords: ["sidebar", "files", "explorer"],
       icon: SidebarLeftIcon,
       shortcutId: "sidebar.toggle",
@@ -277,8 +293,8 @@ export function createCommandItems(
     },
     {
       id: "explorer.toggleHidden",
-      title: "Toggle hidden files",
-      group: "View",
+      title: t("palette.toggleHiddenFiles"),
+      group: t("palette.group.view"),
       keywords: ["dotfiles", "hidden", "explorer", "gitignore", "env"],
       icon: ViewIcon,
       shortcutId: "explorer.toggleHidden",
@@ -286,8 +302,8 @@ export function createCommandItems(
     },
     {
       id: "ai.toggle",
-      title: "Toggle AI agent",
-      group: "AI",
+      title: t("palette.toggleAiAgent"),
+      group: t("palette.group.ai"),
       keywords: ["assistant", "chat", "agent"],
       icon: SparklesIcon,
       shortcutId: "ai.toggle",
@@ -295,8 +311,8 @@ export function createCommandItems(
     },
     {
       id: "ai.askSelection",
-      title: "Ask AI about selection",
-      group: "AI",
+      title: t("palette.askAiAboutSelection"),
+      group: t("palette.group.ai"),
       keywords: ["selection", "explain", "assistant", "chat"],
       icon: SparklesIcon,
       shortcutId: "ai.askSelection",

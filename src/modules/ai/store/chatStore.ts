@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import type { Chat, UIMessage } from "@ai-sdk/react";
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -11,7 +12,11 @@ import {
 } from "../config";
 import { useTodosStore } from "./todoStore";
 import type { AgentUsage } from "../lib/agent";
-import { EMPTY_PROVIDER_KEYS, type ProviderKeys, type CustomEndpointKeys } from "../lib/keyring";
+import {
+  EMPTY_PROVIDER_KEYS,
+  type ProviderKeys,
+  type CustomEndpointKeys,
+} from "../lib/keyring";
 import {
   deleteSessionData,
   deriveTitle,
@@ -88,10 +93,7 @@ type PendingSelection = {
   source: "terminal" | "editor";
 };
 
-type ApprovalResponder = (
-  approvalId: string,
-  approved: boolean,
-) => void;
+type ApprovalResponder = (approvalId: string, approved: boolean) => void;
 
 type StoreState = {
   live: Live;
@@ -283,7 +285,10 @@ export const useChatStore = create<StoreState>((set, get) => ({
     set((s) => ({
       panelOpen: true,
       focusSignal: s.focusSignal + 1,
-      pendingSelections: [...s.pendingSelections, { id, text: trimmed, source }],
+      pendingSelections: [
+        ...s.pendingSelections,
+        { id, text: trimmed, source },
+      ],
     }));
   },
   consumeSelections: () => {
@@ -372,7 +377,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
       .catch((error) => {
         // Stay on the current conversation: opening this one empty could later
         // overwrite a healthy file that was only momentarily unreadable.
-        toast.error("Could not open conversation", {
+        toast.error(t("toast.openConvFailed"), {
           id: `conversation-open:${id}`,
           description: String(error),
         });
@@ -444,7 +449,8 @@ export const useChatStore = create<StoreState>((set, get) => ({
 }));
 
 export function getActiveProviderKey(): string | null {
-  const { selectedModelId, apiKeys, customEndpointKeys } = useChatStore.getState();
+  const { selectedModelId, apiKeys, customEndpointKeys } =
+    useChatStore.getState();
   if (isCompatModelId(selectedModelId)) {
     const eid = endpointIdFromCompatModel(selectedModelId);
     return customEndpointKeys[eid] ?? null;

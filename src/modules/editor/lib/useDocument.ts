@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { notifyDocumentSaved } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
@@ -84,10 +85,13 @@ export function useDocument({ path, onDirtyChange }: Options) {
       }).catch(() => null);
       if (stat && stat.mtime !== known) {
         const name = path.split(/[\\/]/).pop() ?? path;
-        toast.warning("File changed on disk", {
+        toast.warning(t("toast.fileChangedOnDisk"), {
           id: `save-conflict:${path}`,
-          description: `${name} was modified by another program while you had unsaved changes. Overwrite to keep your version.`,
-          action: { label: "Overwrite", onClick: () => void writeToDisk() },
+          description: t("toast.fileChangedOnDiskDesc", name),
+          action: {
+            label: t("toast.overwrite"),
+            onClick: () => void writeToDisk(),
+          },
         });
         return false;
       }

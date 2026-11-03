@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { invoke } from "@tauri-apps/api/core";
 import {
   useCallback,
@@ -527,7 +528,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
           const parents = new Set(deleted.map(dirname));
           await Promise.all([...parents].map((path) => fetchChildren(path)));
         }
-        if (failed > 0) toast.error("Delete failed for one or more items");
+        if (failed > 0) toast.error(t("toast.deleteFailed"));
       };
       await run();
     },
@@ -589,7 +590,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
           await Promise.all([...parents].map((path) => fetchChildren(path)));
         }
         if (outcome.blocked > 0) {
-          toast.warning("Close destination before replacing");
+          toast.warning(t("toast.closeDestFirst"));
         }
         if (outcome.failures > 0) {
           toast.error(
