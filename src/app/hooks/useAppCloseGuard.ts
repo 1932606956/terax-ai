@@ -1,10 +1,12 @@
 import { t } from "@/i18n/zh";
-import { toast } from "sonner";
-import { flushPersist } from "@/modules/ai/store/chatStore";
 import {
   type FlushResult,
   flushSessionWrites,
 } from "@/modules/ai/lib/sessions";
+import { flushPersist } from "@/modules/ai/store/chatStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { Tab } from "@/modules/tabs";
+import { leafHasForegroundProcess, leafIds } from "@/modules/terminal";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   type RefObject,
@@ -13,9 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { Tab } from "@/modules/tabs";
-import { leafHasForegroundProcess, leafIds } from "@/modules/terminal";
+import { toast } from "sonner";
 
 async function anyTerminalBusy(tabs: Tab[]): Promise<boolean> {
   const leaves = tabs.flatMap((t) =>
@@ -35,10 +35,14 @@ export const CLOSE_FLUSH_TIMEOUT_MS = 4_000;
  * "Close anyway" action; any further close request closes immediately.
  */
 export function closeAfterFlush(
-  flush: Pick<FlushResult, "ok">,
+  flush: Pick<FlushResult, "ok" | "failed">,
   alreadyWarned: boolean,
 ): "close" | "warn" {
-  return flush.ok || alreadyWarned ? "close" : "warn";
+  // Only block the close when conversations genuinely failed to write.
+  // A drain timeout or metadata save hiccup without failed writes means the
+  // data is on disk; blocking then would trap the exit behind a toast.
+  if (flush.failed.length > 0) return alreadyWarned ? "close" : "warn";
+  return "close";
 }
 
 export type AppCloseBlocker = {
@@ -59,6 +63,7 @@ export function useAppCloseGuard(tabsRef: RefObject<Tab[]>) {
     useState<AppCloseBlocker | null>(null);
   const forceClose = useRef(false);
   const closing = useRef(false);
+  const forceExitTimer = useRef<number | undefined>(undefined);
   const warned = useRef(false);
   const closeWindow = useCallback(async () => {
     forceClose.current = true;
@@ -89,9 +94,18 @@ export function useAppCloseGuard(tabsRef: RefObject<Tab[]>) {
             : "The latest messages may be lost.",
           action: {
             label: "Close anyway",
-            onClick: () => void closeWindow(),
+            onClick: () => {
+              clearTimeout(forceExitTimer.current);
+              void closeWindow();
+            },
           },
         });
+        // The toast must never be the only way out: if it goes unnoticed
+        // the window would stay open forever after a close request.
+        forceExitTimer.current = window.setTimeout(
+          () => void closeWindow(),
+          5_000,
+        );
         return;
       }
       await closeWindow();

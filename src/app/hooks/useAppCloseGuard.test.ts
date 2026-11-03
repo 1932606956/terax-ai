@@ -24,15 +24,20 @@ describe("canOptOutOfAppClosePrompt", () => {
 
 describe("closeAfterFlush", () => {
   it("closes straight away when chat history was saved", () => {
-    expect(closeAfterFlush({ ok: true }, false)).toBe("close");
+    expect(closeAfterFlush({ ok: true, failed: [] }, false)).toBe("close");
   });
 
-  it("keeps the window open once, with an error, when saving failed", () => {
-    expect(closeAfterFlush({ ok: false }, false)).toBe("warn");
+  it("warns once when conversations failed to write", () => {
+    expect(closeAfterFlush({ ok: false, failed: ["s-1"] }, false)).toBe("warn");
   });
 
   it("never traps the user: after the warning every close request closes", () => {
-    expect(closeAfterFlush({ ok: false }, true)).toBe("close");
+    expect(closeAfterFlush({ ok: false, failed: ["s-1"] }, true)).toBe("close");
+  });
+
+  it("does not block on a drain timeout when nothing failed to write", () => {
+    // Data is on disk; a metadata hiccup must not trap the exit.
+    expect(closeAfterFlush({ ok: false, failed: [] }, false)).toBe("close");
   });
 
   it("bounds how long closing waits for the disk", () => {
