@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { IS_MAC, MOD_PROP } from "@/lib/platform";
 
 /**
@@ -82,116 +83,116 @@ export type Shortcut = {
 export const SHORTCUTS: Shortcut[] = [
   {
     id: "commandPalette.open",
-    label: "Open command palette",
+    label: t("sc.action.openCommandPalette"),
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
   },
   {
     id: "commandPalette.content",
-    label: "Find in files",
+    label: t("sc.action.findInFiles"),
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
   },
   {
     id: "settings.open",
-    label: "Open settings",
+    label: t("sc.action.openSettings"),
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
   },
   {
     id: "tab.new",
-    label: "New tab",
+    label: t("sc.action.newTab"),
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
   {
     id: "tab.newBlock",
-    label: "New Blocks terminal",
+    label: t("sc.action.newBlocksTerminal"),
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
   },
   {
     id: "tab.newPrivate",
-    label: "New private terminal",
+    label: t("sc.action.newPrivateTerminal"),
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
   },
   {
     id: "tab.newPreview",
-    label: "New web preview",
+    label: t("sc.action.newWebPreview"),
     group: "Tabs",
     // Cmd/Ctrl+P now opens the command palette, so web preview moves here.
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "o" }],
   },
   {
     id: "tab.newEditor",
-    label: "New editor tab",
+    label: t("sc.action.newEditorTab"),
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
   },
   {
     id: "tab.close",
-    label: "Close tab or pane",
+    label: t("sc.action.closeTabOrPane"),
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
   },
   {
     id: "pane.splitRight",
-    label: "Split pane right",
+    label: t("sc.action.splitPaneRight"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "d" }],
   },
   {
     id: "pane.splitDown",
-    label: "Split pane down",
+    label: t("sc.action.splitPaneDown"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "d" }],
   },
   {
     id: "pane.focusNext",
-    label: "Focus next pane",
+    label: t("sc.action.focusNextPane"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "]" }],
   },
   {
     id: "pane.focusPrev",
-    label: "Focus previous pane",
+    label: t("sc.action.focusPreviousPane"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "[" }],
   },
   {
     id: "pane.swapLeft",
-    label: "Swap pane left",
+    label: t("sc.action.swapPaneLeft"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
   },
   {
     id: "pane.swapRight",
-    label: "Swap pane right",
+    label: t("sc.action.swapPaneRight"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowRight" }],
   },
   {
     id: "pane.swapUp",
-    label: "Swap pane up",
+    label: t("sc.action.swapPaneUp"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowUp" }],
   },
   {
     id: "pane.swapDown",
-    label: "Swap pane down",
+    label: t("sc.action.swapPaneDown"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
   },
   {
     id: "pane.source",
-    label: "Toggle source panel",
+    label: t("sc.action.toggleSourcePanel"),
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
   },
   {
     id: "terminal.clear",
-    label: "Clear terminal",
+    label: t("sc.action.clearTerminal"),
     group: "Terminal",
     // macOS Terminal's ⌘K (clear scrollback, keep the prompt). Default only on
     // macOS — on other platforms Ctrl+K is readline's kill-line, so we leave it
@@ -200,89 +201,89 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "terminal.toggleInput",
-    label: "Toggle Shell / AI input",
+    label: t("sc.action.toggleShellAiInput"),
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "u" }],
   },
   {
     id: "blocks.prev",
-    label: "Previous command block",
+    label: t("sc.action.previousCommandBlock"),
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "ArrowUp" }],
     allowRepeat: true,
   },
   {
     id: "blocks.next",
-    label: "Next command block",
+    label: t("sc.action.nextCommandBlock"),
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "ArrowDown" }],
     allowRepeat: true,
   },
   {
     id: "tab.next",
-    label: "Next tab",
+    label: t("sc.action.nextTab"),
     group: "Tabs",
     defaultBindings: [{ ctrl: true, key: "Tab" }],
     allowRepeat: true,
   },
   {
     id: "tab.prev",
-    label: "Previous tab",
+    label: t("sc.action.previousTab"),
     group: "Tabs",
     defaultBindings: [{ ctrl: true, shift: true, key: "Tab" }],
     allowRepeat: true,
   },
   {
     id: "tab.selectByIndex",
-    label: "Jump to tab 1–9",
+    label: t("sc.action.jumpToTab19"),
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "space.next",
-    label: "Next space",
+    label: t("sc.action.nextSpace"),
     group: "Spaces",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "]" }],
   },
   {
     id: "space.prev",
-    label: "Previous space",
+    label: t("sc.action.previousSpace"),
     group: "Spaces",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "[" }],
   },
   {
     id: "space.overview",
-    label: "Open spaces",
+    label: t("sc.action.openSpaces"),
     group: "Spaces",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "s" }],
   },
   {
     id: "explorer.search",
-    label: "Search files",
+    label: t("sc.action.searchFiles"),
     group: "Search",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
   },
   {
     id: "search.focus",
-    label: "Find in tab",
+    label: t("sc.action.findInTab"),
     group: "Search",
     defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
   },
   {
     id: "ai.toggle",
-    label: "Toggle AI agent",
+    label: t("sc.action.toggleAiAgent"),
     group: "AI",
     defaultBindings: [{ [MOD_PROP]: true, key: "i" }],
   },
   {
     id: "ai.toggleMini",
-    label: "Toggle AI chat window",
+    label: t("sc.action.toggleAiChatWindow"),
     group: "AI",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "i" }],
   },
   {
     id: "ai.askSelection",
-    label: "Ask AI about selection",
+    label: t("sc.action.askAiAboutSelection"),
     group: "AI",
     // Keep Mod+L available to the shell for clear-screen, including when
     // terminal text is selected and this shortcut is otherwise eligible.
@@ -290,13 +291,13 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "agent.focusAttention",
-    label: "Jump to agent needing attention",
+    label: t("sc.action.jumpToAgentNeedingAttention"),
     group: "AI",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "a" }],
   },
   {
     id: "sidebar.toggle",
-    label: "Toggle file explorer",
+    label: t("sc.action.toggleFileExplorer"),
     group: "View",
     // Plain Mod+B toggles the sidebar everywhere EXCEPT a focused terminal,
     // where it's handed to the shell / Claude Code (its "run in background"
@@ -308,13 +309,13 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "explorer.focus",
-    label: "Toggle file explorer focus",
+    label: t("sc.action.toggleFileExplorerFocus"),
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "e" }],
   },
   {
     id: "explorer.toggleHidden",
-    label: "Toggle hidden files",
+    label: t("sc.action.toggleHiddenFiles"),
     group: "View",
     // Finder's toggle. The binding is on the physical Period key, so it holds
     // on layouts where Shift+. types something else.
@@ -322,7 +323,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomIn",
-    label: "Zoom in",
+    label: t("sc.action.zoomIn"),
     group: "View",
     defaultBindings: [
       { [MOD_PROP]: true, key: "=" },
@@ -332,7 +333,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomOut",
-    label: "Zoom out",
+    label: t("sc.action.zoomOut"),
     group: "View",
     defaultBindings: [
       { [MOD_PROP]: true, key: "-" },
@@ -342,13 +343,13 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomReset",
-    label: "Reset zoom",
+    label: t("sc.action.resetZoom"),
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "0" }],
   },
   {
     id: "view.zenMode",
-    label: "Toggle zen mode",
+    label: t("sc.action.toggleZenMode"),
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "'" }],
   },
@@ -357,13 +358,13 @@ export const SHORTCUTS: Shortcut[] = [
   // Still excluded from the customization UI in ShortcutsSection.
   {
     id: "editor.undo",
-    label: "Undo",
+    label: t("sc.action.undo"),
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, key: "z" }],
   },
   {
     id: "editor.redo",
-    label: "Redo",
+    label: t("sc.action.redo"),
     group: "Editor",
     defaultBindings: [
       { [MOD_PROP]: true, key: "y" },
@@ -374,19 +375,19 @@ export const SHORTCUTS: Shortcut[] = [
   // CodeMirror also binds Mod-s; the global handler preventDefaults first.
   {
     id: "editor.save",
-    label: "Save file",
+    label: t("sc.action.saveFile"),
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, key: "s" }],
   },
   {
     id: "editor.aiComplete",
-    label: "Trigger AI completion",
+    label: t("sc.action.triggerAiCompletion"),
     group: "Editor",
     defaultBindings: [{ alt: true, key: "\\" }],
   },
   {
     id: "editor.codeComplete",
-    label: "Trigger code completion",
+    label: t("sc.action.triggerCodeCompletion"),
     group: "Editor",
     defaultBindings: [{ ctrl: true, key: " " }],
   },
@@ -432,7 +433,7 @@ function keyFromCode(code: string): string | null {
 export function matchBinding(
   e: KeyboardEvent,
   binding: KeyBinding,
-  id?: ShortcutId
+  id?: ShortcutId,
 ): boolean {
   const eventKey = e.key.toLowerCase();
   const bindingKey = binding.key.toLowerCase();
