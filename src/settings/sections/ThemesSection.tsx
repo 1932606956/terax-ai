@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { t } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -41,10 +42,7 @@ import {
 import { listBuiltinThemes } from "@/modules/theme/themes";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import { validateTheme } from "@/modules/theme/validateTheme";
-import {
-  type Backdrop,
-  getBackdropKind,
-} from "@/modules/theme/vibrancy";
+import { type Backdrop, getBackdropKind } from "@/modules/theme/vibrancy";
 import { Edit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -156,18 +154,13 @@ export function ThemesSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader
-        title="Themes"
-        description="Theme, background image, and customization."
-      />
+      <SectionHeader title={t("th.title")} description={t("th.subtitle")} />
 
       {backdrop === "none" ? null : (
         <SettingRow
-          title={backdrop === "mica" ? "Mica background" : "Window vibrancy"}
+          title={backdrop === "mica" ? t("th.mica") : t("th.vibrancy")}
           description={
-            backdrop === "mica"
-              ? "Blend the header, status bar and gutters into the desktop wallpaper. Windows 11 only."
-              : "Frost the header, status bar and gutters over what is behind the window. Panes stay solid."
+            backdrop === "mica" ? t("th.micaDesc") : t("th.vibrancyDesc")
           }
         >
           <Switch
@@ -190,7 +183,7 @@ export function ThemesSection() {
         }}
       >
         <div className="flex items-center justify-between">
-          <Label>Theme</Label>
+          <Label>{t("th.theme")}</Label>
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
@@ -315,7 +308,7 @@ export function ThemesSection() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <Label>Editor theme</Label>
+            <Label>{t("th.editorTheme")}</Label>
             <span className="text-[11px] text-muted-foreground">
               Syntax colors for the code editor. Auto follows the app theme.
             </span>
@@ -366,7 +359,7 @@ export function ThemesSection() {
         }}
       >
         <div className="flex items-center justify-between">
-          <Label>Background</Label>
+          <Label>{t("th.background")}</Label>
           <div className="flex items-center gap-2">
             {backgroundKind === "image" && backgroundImageId ? (
               <Button
@@ -384,7 +377,9 @@ export function ThemesSection() {
               className="h-7 px-2 text-[11px]"
               onClick={onPickBgFile}
             >
-              {backgroundKind === "image" ? "Replace image" : "Choose image"}
+              {backgroundKind === "image"
+                ? t("th.replaceImage")
+                : t("th.chooseImage")}
             </Button>
             <input
               ref={bgInputRef}

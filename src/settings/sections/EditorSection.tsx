@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { t } from "@/i18n/zh";
 import {
   FORMATTER_LABELS,
   FORMATTERS,
@@ -62,14 +63,11 @@ export function EditorSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader
-        title="Editor"
-        description="Editing behavior, saving, and language servers."
-      />
+      <SectionHeader title={t("ed.title")} description={t("ed.subtitle")} />
 
       <div className="flex flex-col gap-2">
-        <Label>Appearance</Label>
-        <SettingRow title="Font size" description="Code editor text size.">
+        <Label>{t("gen.appearance")}</Label>
+        <SettingRow title={t("ed.fontSize")} description={t("ed.fontSizeDesc")}>
           <Select
             value={String(editorFontSize)}
             onValueChange={(v) => void setEditorFontSize(Number(v))}
@@ -93,20 +91,14 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Editing</Label>
-        <SettingRow
-          title="Vim mode"
-          description="Enable Vim keybindings in the code editor."
-        >
+        <Label>{t("ed.editing")}</Label>
+        <SettingRow title={t("ed.vim")} description={t("ed.vimDesc")}>
           <Switch
             checked={vimMode}
             onCheckedChange={(v) => void setVimMode(v)}
           />
         </SettingRow>
-        <SettingRow
-          title="Word wrap"
-          description="Wrap long lines instead of scrolling horizontally."
-        >
+        <SettingRow title={t("ed.wordWrap")} description={t("ed.wordWrapDesc")}>
           <Switch
             checked={editorWordWrap}
             onCheckedChange={(v) => void setEditorWordWrap(v)}
@@ -121,11 +113,8 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Saving</Label>
-        <SettingRow
-          title="Auto save"
-          description="Automatically save files after a delay when changes are detected."
-        >
+        <Label>{t("ed.saving")}</Label>
+        <SettingRow title={t("ed.autoSave")} description={t("ed.autoSaveDesc")}>
           <Switch
             checked={editorAutoSave}
             onCheckedChange={(v) => void setEditorAutoSave(v)}
@@ -138,8 +127,8 @@ export function EditorSection() {
           />
         )}
         <SettingRow
-          title="Format on save"
-          description="Format the file on explicit save (Cmd+S / :w) with the formatter below."
+          title={t("ed.formatOnSave")}
+          description={t("ed.formatOnSaveDesc")}
         >
           <Switch
             checked={editorFormatOnSave}
@@ -149,8 +138,8 @@ export function EditorSection() {
         {editorFormatOnSave && (
           <>
             <SettingRow
-              title="Formatter"
-              description="Language server formats the buffer before writing; external tools run on the saved file from your PATH."
+              title={t("ed.formatter")}
+              description={t("ed.formatterDesc")}
             >
               <FormatterSelect
                 value={editorFormatter}
@@ -207,12 +196,12 @@ function CustomFormatCommandInput() {
 
   return (
     <SettingRow
-      title="Custom command"
-      description="Runs on the saved file; {file} is replaced with the quoted path (appended when omitted)."
+      title={t("ed.customCommand")}
+      description={t("ed.customCommandDesc")}
     >
       <Input
         value={draft}
-        placeholder="mytool --fix {file}"
+        placeholder={t("ed.customCommandPlaceholder")}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (draft !== stored) void setEditorCustomFormatCommand(draft);
@@ -236,10 +225,7 @@ function FormatterOverrides() {
 
   return (
     <>
-      <SettingRow
-        title="Language overrides"
-        description="Use a different formatter for specific languages (e.g. Ruff for Python)."
-      >
+      <SettingRow title={t("ed.overrides")} description={t("ed.overridesDesc")}>
         <button
           type="button"
           disabled={unused.length === 0}
@@ -287,7 +273,7 @@ function FormatterOverrides() {
           <button
             type="button"
             className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title="Remove override"
+            title={t("ed.removeOverride")}
             onClick={() => {
               const next = { ...byLang };
               delete next[lang];
@@ -336,8 +322,8 @@ function AutoSaveDelayInput({
 
   return (
     <SettingRow
-      title="Auto save delay"
-      description="Delay before unsaved changes are saved automatically."
+      title={t("ed.autoSaveDelay")}
+      description={t("ed.autoSaveDelayDesc")}
     >
       <div className="flex items-center gap-2">
         <Input
@@ -386,10 +372,7 @@ function WordWrapColumnInput({
   };
 
   return (
-    <SettingRow
-      title="Wrap column"
-      description="Soft-wrap at this column, or earlier when the editor is narrower."
-    >
+    <SettingRow title={t("ed.wrapColumn")} description={t("ed.wrapColumnDesc")}>
       <div className="flex items-center gap-2">
         <Input
           type="number"

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { t } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import {
   type OsNotificationResult,
@@ -30,10 +31,10 @@ import {
   setTerminalFontSize,
   setTerminalFontWeight,
   setTerminalLetterSpacing,
-  setTerminalScrollback,
-  setTerminalShell,
   setTerminalRenderer,
   setTerminalScreenReader,
+  setTerminalScrollback,
+  setTerminalShell,
   setZoomLevel,
   TERMINAL_FONT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
@@ -56,21 +57,21 @@ const APPEARANCE: {
   label: string;
   icon: typeof ComputerIcon;
 }[] = [
-  { id: "system", label: "System", icon: ComputerIcon },
-  { id: "light", label: "Light", icon: Sun03Icon },
-  { id: "dark", label: "Dark", icon: Moon02Icon },
+  { id: "system", label: t("gen.appearance.system"), icon: ComputerIcon },
+  { id: "light", label: t("gen.appearance.light"), icon: Sun03Icon },
+  { id: "dark", label: t("gen.appearance.dark"), icon: Moon02Icon },
 ];
 
 const TERMINAL_FONT_WEIGHTS = [
-  { value: "normal", label: "Normal" },
-  { value: "500", label: "Medium" },
-  { value: "600", label: "Semi-Bold" },
-  { value: "bold", label: "Bold" },
+  { value: "normal", label: t("gen.weight.normal") },
+  { value: "500", label: t("gen.weight.medium") },
+  { value: "600", label: t("gen.weight.semiBold") },
+  { value: "bold", label: t("gen.weight.bold") },
 ] as const;
 const TERMINAL_CURSOR_STYLES = [
-  { value: "bar", label: "Bar" },
-  { value: "block", label: "Block" },
-  { value: "underline", label: "Underline" },
+  { value: "bar", label: t("gen.cursor.bar") },
+  { value: "block", label: t("gen.cursor.block") },
+  { value: "underline", label: t("gen.cursor.underline") },
 ] as const;
 const LETTER_SPACINGS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
 
@@ -171,13 +172,10 @@ export function GeneralSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader
-        title="General"
-        description="Mode, terminal, and startup."
-      />
+      <SectionHeader title={t("gen.title")} description={t("gen.subtitle")} />
 
       <div className="flex flex-col gap-2">
-        <Label>Appearance</Label>
+        <Label>{t("gen.appearance")}</Label>
         <div className="grid grid-cols-3 gap-2">
           {APPEARANCE.map((o) => (
             <button
@@ -203,7 +201,7 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Zoom</Label>
+        <Label>{t("gen.zoom")}</Label>
         <div className="flex flex-col gap-3 rounded-lg border border-border/60 p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11.5px] text-muted-foreground">
@@ -224,10 +222,10 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Explorer</Label>
+        <Label>{t("gen.explorer")}</Label>
         <SettingRow
-          title="Show hidden files"
-          description="Include dot-prefixed files and folders (.env, .gitignore, .config) in the file explorer and search."
+          title={t("gen.showHidden")}
+          description={t("gen.showHiddenDesc")}
         >
           <Switch
             checked={showHidden}
@@ -235,8 +233,8 @@ export function GeneralSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Git decorations"
-          description="Tint changed files and dim gitignored entries in the file explorer."
+          title={t("gen.gitDecorations")}
+          description={t("gen.gitDecorationsDesc")}
         >
           <Switch
             checked={explorerGitDecorations}
@@ -246,10 +244,10 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Terminal</Label>
+        <Label>{t("gen.terminal")}</Label>
         <SettingRow
-          title="Terminal renderer"
-          description="Automatic uses WebGPU with WebGL fallback. Choose WebGL for graphics compatibility. Applies to new terminals."
+          title={t("gen.renderer")}
+          description={t("gen.rendererDesc")}
         >
           <Select
             value={terminalRenderer}
@@ -267,8 +265,8 @@ export function GeneralSection() {
           </Select>
         </SettingRow>
         <SettingRow
-          title="Screen reader support"
-          description="Expose terminal output as accessible text. Page Up and Page Down browse history when the output region is focused."
+          title={t("gen.screenReader")}
+          description={t("gen.screenReaderDesc")}
         >
           <Switch
             checked={terminalScreenReader}
@@ -276,8 +274,8 @@ export function GeneralSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Cursor blinking"
-          description="Blink the terminal cursor. Off by default for lower idle CPU, matching VS Code and the macOS terminal."
+          title={t("gen.cursorBlink")}
+          description={t("gen.cursorBlinkDesc")}
         >
           <Switch
             checked={terminalCursorBlink}
@@ -285,8 +283,8 @@ export function GeneralSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Cursor style"
-          description="Shape of the terminal cursor."
+          title={t("gen.cursorStyle")}
+          description={t("gen.cursorStyleDesc")}
         >
           <Select
             value={terminalCursorStyle}
@@ -316,8 +314,8 @@ export function GeneralSection() {
           onCommit={(v) => void setTerminalFontFamily(v)}
         />
         <SettingRow
-          title="Font weight"
-          description="Thickness of terminal characters"
+          title={t("gen.fontWeight")}
+          description={t("gen.fontWeightDesc")}
         >
           <Select
             value={terminalFontWeight}
@@ -343,13 +341,13 @@ export function GeneralSection() {
           </Select>
         </SettingRow>
         <SettingRow
-          title="Integrated terminal shell"
+          title={t("gen.shell")}
           description={
             shells.find((s) => s.path === terminalShell)?.integrated === false
-              ? "Command blocks and directory tracking are unavailable for this shell."
+              ? t("gen.shellNoBlocks")
               : wslDistros.length > 0
-                ? "Shell for the integrated terminal. WSL spaces use the distro login shell. Existing tabs keep their shell."
-                : "Shell for new terminal tabs. Existing tabs keep their shell."
+                ? t("gen.shellWsl")
+                : t("gen.shellDesc")
           }
         >
           <Select
@@ -378,8 +376,8 @@ export function GeneralSection() {
         </SettingRow>
         {(wslDistros.length > 0 || defaultWorkspaceEnv !== "local") && (
           <SettingRow
-            title="Workspace environment"
-            description="Where new spaces run, terminal and AI agent alike: Windows or a WSL distro. Existing spaces keep theirs; switch any from the status bar."
+            title={t("gen.workspace")}
+            description={t("gen.workspaceDesc")}
           >
             <Select
               value={defaultWorkspaceEnv}
@@ -420,8 +418,8 @@ export function GeneralSection() {
           </SettingRow>
         )}
         <SettingRow
-          title="Letter spacing"
-          description="Extra horizontal space between characters (px). Use negative values to tighten Nerd Fonts."
+          title={t("gen.letterSpacing")}
+          description={t("gen.letterSpacingDesc")}
         >
           <Select
             value={String(terminalLetterSpacing)}
@@ -439,7 +437,10 @@ export function GeneralSection() {
             </SelectContent>
           </Select>
         </SettingRow>
-        <SettingRow title="Font size" description="Terminal text size.">
+        <SettingRow
+          title={t("gen.fontSize")}
+          description={t("gen.fontSizeDesc")}
+        >
           <Select
             value={String(terminalFontSize)}
             onValueChange={(v) => void setTerminalFontSize(Number(v))}
@@ -461,8 +462,8 @@ export function GeneralSection() {
           </Select>
         </SettingRow>
         <SettingRow
-          title="Scrollback"
-          description="Lines of history kept per terminal. Higher uses more RAM (~3 KB / line)."
+          title={t("gen.scrollback")}
+          description={t("gen.scrollbackDesc")}
         >
           <Select
             value={String(terminalScrollback)}
@@ -485,8 +486,8 @@ export function GeneralSection() {
           </Select>
         </SettingRow>
         <SettingRow
-          title="Confirm before killing a running process"
-          description="Ask before closing a terminal tab or quitting while a command is still running. Unsaved editor changes are always confirmed."
+          title={t("gen.confirmKill")}
+          description={t("gen.confirmKillDesc")}
         >
           <Switch
             checked={confirmCloseRunningTerminal}
@@ -496,10 +497,10 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Agents</Label>
+        <Label>{t("gen.agents")}</Label>
         <SettingRow
-          title="Coding agent notifications"
-          description="Alert when a coding agent needs your input or finishes. Native notification when Terax is unfocused, in-app otherwise."
+          title={t("gen.agentNotifications")}
+          description={t("gen.agentNotificationsDesc")}
         >
           <div className="flex items-center gap-2">
             <Button
@@ -523,8 +524,8 @@ export function GeneralSection() {
           </div>
         </SettingRow>
         <SettingRow
-          title="Notification sound"
-          description="Play a sound with agent notifications and in-app alerts."
+          title={t("gen.notificationSound")}
+          description={t("gen.notificationSoundDesc")}
         >
           <Switch
             checked={agentNotificationSound}
@@ -535,11 +536,11 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Startup</Label>
+        <Label>{t("gen.startup")}</Label>
         <div className="flex flex-col gap-2">
           <SettingRow
-            title="Launch at login"
-            description="Open Terax automatically when you sign in."
+            title={t("gen.launchAtLogin")}
+            description={t("gen.launchAtLoginDesc")}
           >
             <Switch
               checked={autostart}
@@ -547,8 +548,8 @@ export function GeneralSection() {
             />
           </SettingRow>
           <SettingRow
-            title="Restore window position & size"
-            description="Reopen the main window where you left it. Applies on next launch."
+            title={t("gen.restoreWindow")}
+            description={t("gen.restoreWindowDesc")}
           >
             <Switch
               checked={restoreWindowState}
@@ -572,32 +573,32 @@ function Label({ children }: { children: React.ReactNode }) {
 function notificationTestLabel(status: NotificationTestState): string {
   switch (status) {
     case "waiting":
-      return "Switch apps...";
+      return t("gen.notif.switchApps");
     case "sending":
-      return "Sending...";
+      return t("gen.notif.sending");
     case "requested":
-      return "Requested";
+      return t("gen.notif.requested");
     case "denied":
-      return "Blocked";
+      return t("gen.notif.blocked");
     case "failed":
-      return "Failed";
+      return t("gen.notif.failed");
     default:
-      return "Test in 2s";
+      return t("gen.notif.testIn2s");
   }
 }
 
 function notificationTestTitle(status: NotificationTestState): string {
   switch (status) {
     case "waiting":
-      return "Switch to another app to verify native delivery";
+      return t("gen.notif.switchHint");
     case "requested":
-      return "The native notification was requested";
+      return t("gen.notif.requestedHint");
     case "denied":
-      return "Notifications are disabled by the system";
+      return t("gen.notif.blockedHint");
     case "failed":
-      return "Terax could not request a native notification";
+      return t("gen.notif.failedHint");
     default:
-      return "Send a native test notification after two seconds";
+      return t("gen.notif.titleIdle");
   }
 }
 
@@ -624,13 +625,13 @@ function FontFamilyInput({
 
   return (
     <SettingRow
-      title="Font family"
-      description='Nerd Font name for icons (e.g. "CaskaydiaCove Nerd Font Mono"). Leave blank to auto-detect.'
+      title={t("gen.fontFamily")}
+      description={t("gen.fontFamilyDesc")}
     >
       <input
         type="text"
         value={draft}
-        placeholder="Auto-detect"
+        placeholder={t("gen.fontAutoDetect")}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {

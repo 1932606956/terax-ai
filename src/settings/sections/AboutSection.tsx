@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { t } from "@/i18n/zh";
 import { useUpdater } from "@/modules/updater";
 import { GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -32,20 +33,20 @@ export function AboutSection() {
   const ready = status.kind === "ready";
   const checkLabel =
     status.kind === "uptodate"
-      ? "You're up to date"
+      ? t("ab.upToDate")
       : status.kind === "error"
-        ? "Check failed — retry"
+        ? t("ab.checkFailed")
         : checking
-          ? "Checking…"
+          ? t("ab.checking")
           : downloading
-            ? "Downloading…"
+            ? t("ab.downloading")
             : ready
-              ? "Restart to install"
+              ? t("ab.restartToInstall")
               : available
-                ? `Install v${status.update.version}`
+                ? t("ab.installVersion", status.update.version)
                 : manualAvailable
-                  ? `Update to v${status.info.version}`
-                  : "Check for updates";
+                  ? t("ab.updateVersion", status.info.version)
+                  : t("ab.checkForUpdates");
   const onUpdateClick = () => {
     if (available) void install();
     else void check({ manual: true });
@@ -66,7 +67,7 @@ export function AboutSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="About" description="" />
+      <SectionHeader title={t("ab.title")} description={t("ab.subtitle")} />
 
       <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-5">
         <img src="/logo.png" alt="" className="size-12" draggable={false} />
