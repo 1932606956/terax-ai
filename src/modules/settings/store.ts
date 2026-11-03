@@ -3,7 +3,9 @@ import {
   type CustomEndpoint,
   DEFAULT_AUTOCOMPLETE_MODEL,
   DEFAULT_MODEL_ID,
+  compatModelIdForEndpoint,
   DEFAULT_STT_PROVIDER,
+  isCompatModelId,
   isKnownModelId,
   LMSTUDIO_DEFAULT_BASE_URL,
   MLX_DEFAULT_BASE_URL,
@@ -412,9 +414,19 @@ export async function loadPreferences(): Promise<Preferences> {
     ),
     defaultModelId: ((): ModelId => {
       const stored = get<string>(KEY_DEFAULT_MODEL);
-      return stored && isKnownModelId(stored)
-        ? stored
-        : DEFAULT_PREFERENCES.defaultModelId;
+      if (stored && isKnownModelId(stored)) return stored;
+      // Custom endpoints contribute compat-<id> model ids. Accept the stored
+      // default only while its endpoint still exists; dead ids fall back to
+      // the built-in default (mirrors removeCustomEndpoint's fallback).
+      if (stored && isCompatModelId(stored)) {
+        const endpoints =
+          get<CustomEndpoint[]>(KEY_CUSTOM_ENDPOINTS) ??
+          DEFAULT_PREFERENCES.customEndpoints;
+        if (endpoints.some((ep) => compatModelIdForEndpoint(ep.id) === stored)) {
+          return stored as ModelId;
+        }
+      }
+      return DEFAULT_PREFERENCES.defaultModelId;
     })(),
     editorTheme: ((): EditorThemePref => {
       const stored = get<string>(KEY_EDITOR_THEME);
@@ -487,10 +499,10 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.whispercppBaseURL,
     favoriteModelIds: (
       get<string[]>(KEY_FAVORITE_MODELS) ?? DEFAULT_PREFERENCES.favoriteModelIds
-    ).filter(isKnownModelId),
+    ).filter((id) => isKnownModelId(id) || isCompatModelId(id)),
     recentModelIds: (
       get<string[]>(KEY_RECENT_MODELS) ?? DEFAULT_PREFERENCES.recentModelIds
-    ).filter(isKnownModelId),
+    ).filter((id) => isKnownModelId(id) || isCompatModelId(id)),
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
     editorWordWrap:
       get<boolean>(KEY_EDITOR_WORD_WRAP) ?? DEFAULT_PREFERENCES.editorWordWrap,
