@@ -17,17 +17,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import {
-  getBindingTokens,
-  SHORTCUTS,
-} from "@/modules/shortcuts/shortcuts";
+import { getBindingTokens, SHORTCUTS } from "@/modules/shortcuts/shortcuts";
 import {
   type CustomEndpoint,
   compatModelIdForEndpoint,
   DEFAULT_MODEL_ID,
   getAutocompleteEligibleModels,
   getCompatModelInfo,
-  getModel,
   getProvider,
   isCompatModelId,
   MODELS,
@@ -36,6 +32,7 @@ import {
   type ProviderId,
   type ProviderInfo,
   providerNeedsKey,
+  resolveModel,
   STT_PROVIDER_LABELS,
   type SttProvider,
   WHISPERCPP_DEFAULT_BASE_URL,
@@ -545,6 +542,7 @@ function DefaultsBlock({
           <DefaultModelPicker
             defaultModel={defaultModel}
             configuredIds={configuredIds}
+            customEndpoints={customEndpoints}
           />
         </FieldRow>
         <AutocompleteRow
@@ -560,11 +558,14 @@ function DefaultsBlock({
 function DefaultModelPicker({
   defaultModel,
   configuredIds,
+  customEndpoints,
 }: {
   defaultModel: ModelId;
   configuredIds: Set<ProviderId>;
+  customEndpoints: readonly CustomEndpoint[];
 }) {
-  const m = getModel(defaultModel);
+  const m = resolveModel(defaultModel, customEndpoints);
+  const compatDefault = isCompatModelId(defaultModel) ? m : null;
   const hasAny = configuredIds.size > 0;
 
   return (
@@ -596,6 +597,27 @@ function DefaultModelPicker({
         className="min-w-70 p-1"
       >
         <div className="max-h-72 overflow-y-auto overscroll-contain pr-1">
+          {compatDefault ? (
+            <div className="px-1 pt-1.5 first:pt-1">
+              <div className="mb-0.5 flex items-center gap-1.5 px-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                <ProviderIcon provider="openai-compatible" size={11} />
+                <span>Custom</span>
+              </div>
+              <DropdownMenuItem
+                className="flex items-start gap-2 bg-accent/50 text-[12px]"
+                onSelect={() =>
+                  void setDefaultModel(compatDefault.id as ModelId)
+                }
+              >
+                <span className="flex flex-1 flex-col">
+                  <span>{compatDefault.label}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {compatDefault.description}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            </div>
+          ) : null}
           {PROVIDERS.filter((p) => configuredIds.has(p.id)).map((p) => {
             const models = MODELS.filter((x) => x.provider === p.id);
             if (models.length === 0) return null;
