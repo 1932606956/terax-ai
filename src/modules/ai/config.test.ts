@@ -53,8 +53,11 @@ describe("resolveModel", () => {
 
 
 
-  it("throws on an unknown static model id", () => {
-    expect(() => resolveModel("nope-not-real")).toThrow();
+  it("falls back to a placeholder for unknown or empty ids", () => {
+    // No catalog exists anymore; a stale or empty selection must render,
+    // never throw (a throw here blanks the whole UI on boot).
+    expect(resolveModel("nope-not-real").provider).toBe("openai-compatible");
+    expect(resolveModel("").provider).toBe("openai-compatible");
   });
 });
 

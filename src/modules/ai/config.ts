@@ -121,7 +121,11 @@ export function resolveModel(
 ): ModelInfo {
   if (isCompatModelId(modelId)) return getCompatModelInfo(modelId, endpoints);
   const m = MODELS.find((x) => x.id === modelId);
-  if (!m) throw new Error(`Unknown model: ${modelId}`);
+  if (!m) {
+    // An empty or stale id (fresh install, removed endpoint) must never
+    // take the UI down; fall back to a placeholder.
+    return getCompatModelInfo(modelId, endpoints);
+  }
   return m;
 }
 
