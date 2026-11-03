@@ -1,7 +1,11 @@
 import { generateText, stepCountIs } from "ai";
-import { getModel, type ModelId } from "../config";
+import {
+  type CustomEndpoint,
+  endpointIdFromCompatModel,
+  isCompatModelId,
+} from "../config";
 import { buildLanguageModel } from "../lib/agent";
-import type { ProviderKeys } from "../lib/keyring";
+import type { CustomEndpointKeys, ProviderKeys } from "../lib/keyring";
 import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
 import { buildSearchTools } from "../tools/search";
@@ -15,7 +19,8 @@ type Args = {
   keys: ProviderKeys;
   modelId: string;
   toolContext: ToolContext;
-  lmstudioBaseURL?: string;
+  customEndpoints?: readonly CustomEndpoint[];
+  customEndpointKeys?: CustomEndpointKeys;
   onStep?: (label: string) => void;
 };
 
@@ -31,7 +36,8 @@ export async function runSubagent({
   keys,
   modelId,
   toolContext,
-  lmstudioBaseURL,
+  customEndpoints = [],
+  customEndpointKeys = {},
   onStep,
 }: Args): Promise<RunResult> {
   const def = SUBAGENTS[type];
@@ -46,11 +52,16 @@ export async function runSubagent({
     if (t in readOnly) tools[t] = readOnly[t];
   }
 
+  // Sub-agents only run on a custom endpoint model.
+  const ep = customEndpoints.find(
+    (e) => isCompatModelId(modelId) && e.id === endpointIdFromCompatModel(modelId),
+  );
   const model = await buildLanguageModel(
-    getModel(modelId as ModelId).provider,
+    "openai-compatible",
     keys,
-    getModel(modelId as ModelId).id,
-    { lmstudioBaseURL },
+    ep?.modelId.trim() || modelId,
+    { openaiCompatibleBaseURL: ep?.baseURL },
+    ep ? customEndpointKeys[ep.id] : undefined,
   );
 
   const start = Date.now();

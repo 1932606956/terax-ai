@@ -1,6 +1,6 @@
 import { t } from "@/i18n/zh";
 import { endpointIdFromCompatModel } from "@/modules/ai/config";
-import { getCustomEndpointKey, getKey } from "@/modules/ai/lib/keyring";
+import { getCustomEndpointKey } from "@/modules/ai/lib/keyring";
 import { lspFormatDocument, useLspExtension } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
@@ -144,24 +144,12 @@ export const EditorPane = memo(
       let cancelled = false;
       const refresh = async () => {
         const s = usePreferencesStore.getState();
-        const provider = s.autocompleteProvider;
-        if (
-          provider === "lmstudio" ||
-          provider === "mlx" ||
-          provider === "ollama"
-        ) {
-          apiKeyRef.current = null;
-          return;
-        }
-        // OpenAI-compatible keys live in a per-endpoint keyring slot.
-        if (provider === "openai-compatible") {
+        // Keys live in a per-endpoint keyring slot.
+        {
           const eid = endpointIdFromCompatModel(s.autocompleteModelId);
           const k = eid ? await getCustomEndpointKey(eid) : null;
           if (!cancelled) apiKeyRef.current = k;
-          return;
         }
-        const k = await getKey(provider);
-        if (!cancelled) apiKeyRef.current = k;
       };
       void refresh();
       let unlistenKeys: (() => void) | undefined;
@@ -357,18 +345,7 @@ export const EditorPane = memo(
                       e.id === endpointIdFromCompatModel(s.autocompleteModelId),
                   )
                 : undefined;
-            const modelId =
-              p === "lmstudio"
-                ? s.lmstudioModelId
-                : p === "mlx"
-                  ? s.mlxModelId
-                  : p === "ollama"
-                    ? s.ollamaModelId
-                    : p === "openai-compatible"
-                      ? (compatEp?.modelId ?? "")
-                      : p === "openrouter"
-                        ? s.openrouterModelId
-                        : s.autocompleteModelId;
+            const modelId = compatEp?.modelId ?? "";
             return {
               enabled: s.autocompleteEnabled,
               trigger: s.autocompleteTrigger,

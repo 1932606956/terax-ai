@@ -882,15 +882,8 @@ export function useSourceControlPanel(
         selectedModelId,
         chatState.apiKeys,
         {
-          lmstudioBaseURL: prefs.lmstudioBaseURL,
-          lmstudioModelId,
-          mlxBaseURL: prefs.mlxBaseURL,
-          mlxModelId,
-          ollamaBaseURL: prefs.ollamaBaseURL,
-          ollamaModelId,
           openaiCompatibleBaseURL,
-          openaiCompatibleModelId,
-          openrouterModelId,
+          customEndpoints: prefs.customEndpoints,
         },
       );
       const result = await generateText({

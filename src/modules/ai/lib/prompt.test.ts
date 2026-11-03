@@ -14,7 +14,7 @@ describe("prepareAgentPrompt", () => {
       "Stable instructions",
       "Plan instructions",
       history,
-      "openai",
+      "openai-compatible",
     );
 
     expect(prompt.system).toEqual([
@@ -27,26 +27,6 @@ describe("prepareAgentPrompt", () => {
     );
   });
 
-  it("keeps Anthropic cache markers on the stable prefix and rotating tail", () => {
-    const prompt = prepareAgentPrompt(
-      "Stable instructions",
-      "Plan instructions",
-      history,
-      "anthropic",
-    );
-
-    expect(prompt.system[0].providerOptions).toEqual({
-      anthropic: { cacheControl: { type: "ephemeral" } },
-    });
-    expect(prompt.system[1].providerOptions).toBeUndefined();
-    expect(prompt.messages[0].providerOptions).toBeUndefined();
-    expect(prompt.messages[1].providerOptions).toEqual({
-      anthropic: { cacheControl: { type: "ephemeral" } },
-    });
-    expect(history.every((message) => message.providerOptions == null)).toBe(
-      true,
-    );
-  });
 
   it("does not trigger the SDK system-message warning", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -64,7 +44,7 @@ describe("prepareAgentPrompt", () => {
       "Stable instructions",
       "Plan instructions",
       history,
-      "openai",
+      "openai-compatible",
     );
 
     try {

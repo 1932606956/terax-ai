@@ -83,13 +83,7 @@ function eagerChunk(id: string): string | null {
 }
 
 const AI_PROVIDER_CHUNKS: Record<string, string> = {
-  "@ai-sdk/anthropic": "ai-anthropic",
-  "@ai-sdk/google": "ai-google",
   "@ai-sdk/openai-compatible": "ai-openai-compat",
-  "@ai-sdk/openai": "ai-openai",
-  "@ai-sdk/cerebras": "ai-cerebras",
-  "@ai-sdk/groq": "ai-groq",
-  "@ai-sdk/xai": "ai-xai",
 };
 
 /** Heavy features loaded on demand; each lands in its own named chunk. */

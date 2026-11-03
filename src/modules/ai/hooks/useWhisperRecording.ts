@@ -29,8 +29,8 @@ function getApiKeyForStt(
   apiKeys: import("../lib/keyring").ProviderKeys,
   provider: SttProvider,
 ): string | null {
-  if (provider === "openai") return apiKeys.openai;
-  if (provider === "groq") return apiKeys.groq;
+  void apiKeys;
+  void provider;
   return null;
 }
 
@@ -43,7 +43,6 @@ export function useWhisperRecording({
 }) {
   const apiKeys = useChatStore((s) => s.apiKeys);
   const sttProvider = usePreferencesStore((s) => s.sttProvider);
-  const groqSttModel = usePreferencesStore((s) => s.groqSttModel);
   const whispercppBaseURL = usePreferencesStore((s) => s.whispercppBaseURL);
   const [state, setState] = useState<State>("idle");
   const recRef = useRef<MediaRecorder | null>(null);
@@ -60,8 +59,7 @@ export function useWhisperRecording({
     typeof MediaRecorder !== "undefined";
 
   const sttOptions: SttOptions = {
-    groqSttModel,
-    whispercppBaseURL,
+        whispercppBaseURL,
   };
 
   const teardownStream = () => {
