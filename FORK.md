@@ -9,7 +9,7 @@
 
 | 分支 | 角色 |
 |---|---|
-| `main` | 上游镜像，只 fast-forward 跟随 `upstream/main`，**不放任何本地提交** |
+| `main` | 上游镜像，跟随 `upstream/main`；唯一例外：`.github/` 下的 fork 基建（workflow_dispatch 的 workflow 必须在默认分支注册），不碰产品代码 |
 | `fix/default-model-and-compat-context` | 本地定制构建线，叠加全部私有补丁，定期 `git merge main` 吸收上游 |
 
 ## 同步流程
