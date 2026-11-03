@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import {
   clearAgentActivity,
   ensureAgentActivityListener,
@@ -121,7 +122,7 @@ export async function openPty(
         if (notice !== undefined) toast.dismiss(notice);
         notice = undefined;
       } else if (status === "stalled" || status === "failed") {
-        notice = toast.error("Terminal output paused", {
+        notice = toast.error(t("toast.ptyPaused"), {
           id: notice,
           duration: Number.POSITIVE_INFINITY,
           description:

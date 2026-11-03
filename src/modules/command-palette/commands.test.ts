@@ -68,12 +68,12 @@ describe("createCommandItems", () => {
   it("disables split when there is no terminal tab", () => {
     const editorTab = { ...terminalTab(1), kind: "editor" } as unknown as Tab;
     expect(reasonById({ tabs: [editorTab] }, "pane.splitRight")).toBe(
-      "No terminal tab",
+      "无终端标签页",
     );
   });
 
   it("disables close on the last tab with a single pane", () => {
-    expect(reasonById({}, "tab.close")).toBe("Last tab");
+    expect(reasonById({}, "tab.close")).toBe("最后一个标签页");
   });
 
   it("enables close when more than one tab is open", () => {
@@ -84,13 +84,13 @@ describe("createCommandItems", () => {
 
   it("disables content search when there is no searchable view", () => {
     expect(reasonById({ searchTarget: null as never }, "search.focus")).toBe(
-      "No searchable view",
+      "无可搜索视图",
     );
   });
 
   it("disables explorer search when there is no workspace root", () => {
     expect(reasonById({ explorerRoot: null }, "explorer.search")).toBe(
-      "No workspace root",
+      "无工作区根目录",
     );
   });
 
@@ -99,6 +99,6 @@ describe("createCommandItems", () => {
       { spaces: [{ id: "sp1", name: "One" }], activeSpaceId: "sp1" },
       "spaces.switch.sp1",
     );
-    expect(reason).toBe("Current space");
+    expect(reason).toBe("当前空间");
   });
 });

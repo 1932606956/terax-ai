@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { homeRelativePath } from "@/lib/homeRelativePath";
 import "@/modules/terminal/block/block.css";
 
@@ -397,7 +398,7 @@ function SearchBar({
       () => {
         if (controller.signal.aborted) return;
         setPending(false);
-        toast.error("Could not search this block");
+        toast.error(t("toast.searchBlockFailed"));
       },
     );
   };

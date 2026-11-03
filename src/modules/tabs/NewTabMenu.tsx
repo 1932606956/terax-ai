@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -77,7 +78,7 @@ export function NewTabMenu({
                 variant="ghost"
                 size="icon"
                 className="ml-1 size-6 shrink-0 rounded-full bg-foreground/[0.06] text-muted-foreground ring-1 ring-inset ring-foreground/[0.04] hover:bg-foreground/[0.12] hover:text-foreground"
-                title="New tab"
+                title={t("tabs.newTab")}
               >
                 <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={2} />
               </Button>
@@ -99,7 +100,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Terminal</span>
+                <span className="flex-1">{t("tabs.terminal")}</span>
                 <span className="text-xs text-muted-foreground">
                   {fmtShortcut(MOD_KEY, "T")}
                 </span>
@@ -110,7 +111,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Blocks</span>
+                <span className="flex-1">{t("tabs.blocks")}</span>
                 <span className="text-xs text-muted-foreground">
                   {fmtShortcut(MOD_KEY, SHIFT_KEY, "T")}
                 </span>
@@ -121,7 +122,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Agents</span>
+                <span className="flex-1">{t("tabs.agents")}</span>
                 <HugeiconsIcon
                   icon={ArrowRight01Icon}
                   size={14}
@@ -135,7 +136,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Privacy</span>
+                <span className="flex-1">{t("tabs.privacy")}</span>
                 <span className="text-xs text-muted-foreground">
                   {fmtShortcut(MOD_KEY, "R")}
                 </span>
@@ -146,7 +147,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Editor</span>
+                <span className="flex-1">{t("tabs.editor")}</span>
                 <span className="text-xs text-muted-foreground">
                   {fmtShortcut(MOD_KEY, "E")}
                 </span>
@@ -157,7 +158,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Preview</span>
+                <span className="flex-1">{t("tabs.preview")}</span>
                 <span className="text-xs text-muted-foreground">
                   {fmtShortcut(MOD_KEY, "P")}
                 </span>
@@ -168,7 +169,7 @@ export function NewTabMenu({
                   size={14}
                   strokeWidth={1.75}
                 />
-                <span className="flex-1">Git Graph</span>
+                <span className="flex-1">{t("tabs.gitGraph")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

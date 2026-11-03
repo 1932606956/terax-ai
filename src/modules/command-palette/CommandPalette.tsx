@@ -32,6 +32,7 @@ import {
   CONTENT_SEARCH_MIN_QUERY,
   useContentSearch,
 } from "./hooks/useContentSearch";
+import { t } from "@/i18n/zh";
 import { fuzzyBest } from "./lib/fuzzy";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruRank, mruSnapshot, recordUse } from "./lib/mru";
@@ -203,19 +204,19 @@ export function CommandPalette({
   );
 
   const placeholder = inThemes
-    ? "Search themes..."
+    ? t("palette.ph.searchThemes")
     : parsed.mode === "content"
-      ? "Find text in files..."
+      ? t("palette.ph.findText")
       : parsed.mode === "history"
-        ? "Search command history..."
-        : "Type a command, > for history, # to find in files";
+        ? t("palette.ph.searchHistory")
+        : t("palette.ph.default");
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Command Palette"
-      description="Run a command, switch theme, or search your workspace."
+      title={t("palette.title")}
+      description={t("palette.description")}
       className="top-1/2 w-[min(680px,calc(100vw-32px))] -translate-y-1/2"
     >
       <Command
@@ -266,7 +267,9 @@ export function CommandPalette({
                     ) : null}
                   </CommandItem>
                 ))}
-                {themes.length === 0 ? <StatusItem label="No themes" /> : null}
+                {themes.length === 0 ? (
+                  <StatusItem label={t("palette.noThemes")} />
+                ) : null}
               </CommandGroup>
             ) : parsed.mode === "commands" ? (
               rankedCommands.length === 0 ? (
@@ -295,15 +298,15 @@ export function CommandPalette({
             ) : parsed.mode === "content" ? (
               <CommandGroup heading="Contents">
                 {!workspaceRoot ? (
-                  <StatusItem label="No workspace root" />
+                  <StatusItem label={t("palette.reason.noWorkspaceRoot")} />
                 ) : parsed.term.length < CONTENT_SEARCH_MIN_QUERY ? (
-                  <StatusItem label="Type at least 2 characters" />
+                  <StatusItem label={t("palette.typeAtLeast2")} />
                 ) : (
                   <AsyncBody
                     loading={content.loading}
                     error={content.error}
                     empty={content.results.length === 0}
-                    emptyLabel="No matches"
+                    emptyLabel={t("palette.noMatches")}
                     onRetry={content.retry}
                   >
                     {content.results.map((hit) => (
@@ -329,15 +332,15 @@ export function CommandPalette({
                 )}
               </CommandGroup>
             ) : parsed.mode === "history" ? (
-              <CommandGroup heading="Command history">
+              <CommandGroup heading={t("palette.heading.history")}>
                 {!insertCommand ? (
-                  <StatusItem label="Open a terminal to run history" />
+                  <StatusItem label={t("palette.openTerminalForHistory")} />
                 ) : (
                   <AsyncBody
                     loading={history.loading}
                     error={history.error}
                     empty={history.results.length === 0}
-                    emptyLabel="No history"
+                    emptyLabel={t("palette.noHistory")}
                     onRetry={history.retry}
                   >
                     {history.results.map((cmd) => (
@@ -362,7 +365,7 @@ export function CommandPalette({
                 )}
               </CommandGroup>
             ) : (
-              <CommandGroup heading="Search modes">
+              <CommandGroup heading={t("palette.heading.searchModes")}>
                 {MODE_HINTS.map((hint) => (
                   <CommandItem
                     key={hint.sigil}
@@ -395,7 +398,11 @@ function rankCommands(
   }
   const scored: { item: PaletteItem; s: number }[] = [];
   for (const item of items) {
-    const s = fuzzyBest(term, [item.title, item.group, ...(item.keywords ?? [])]);
+    const s = fuzzyBest(term, [
+      item.title,
+      item.group,
+      ...(item.keywords ?? []),
+    ]);
     if (s !== null) scored.push({ item, s });
   }
   scored.sort(
@@ -459,14 +466,14 @@ function AsyncBody({
   if (error) {
     return (
       <>
-        <StatusItem label="Search failed" tone="error" />
+        <StatusItem label={t("palette.searchFailed")} tone="error" />
         <CommandItem value="retry" onSelect={onRetry} className="text-[12.5px]">
-          <span>Retry</span>
+          <span>{t("palette.retry")}</span>
         </CommandItem>
       </>
     );
   }
-  if (empty && loading) return <StatusItem label="Searching..." />;
+  if (empty && loading) return <StatusItem label={t("palette.searching")} />;
   if (empty) return <StatusItem label={emptyLabel} />;
   return <>{children}</>;
 }
@@ -493,7 +500,9 @@ function StatusItem({
         />
       ) : null}
       <span
-        className={tone === "error" ? "text-destructive" : "text-muted-foreground"}
+        className={
+          tone === "error" ? "text-destructive" : "text-muted-foreground"
+        }
       >
         {label}
       </span>
@@ -505,7 +514,7 @@ function EmptyHint() {
   return (
     <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
       <HugeiconsIcon icon={CommandIcon} size={18} strokeWidth={1.5} />
-      <span>No commands found. Type ? to see search modes.</span>
+      <span>{t("palette.noCommandsFound")}</span>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KEY_SEP } from "@/lib/platform";
@@ -68,7 +69,10 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
       return tokens.join(KEY_SEP);
     }, [userShortcuts]);
 
-    const baseLabel = target?.kind === "git-history" ? "Git search" : "Search";
+    const baseLabel =
+      target?.kind === "git-history"
+        ? t("header.gitSearch")
+        : t("header.search");
 
     const placeholder = useMemo(() => {
       return shortcutText ? `${baseLabel} (${shortcutText})` : baseLabel;
@@ -182,7 +186,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
                   inputRef.current?.focus();
                 }}
                 className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                aria-label="Clear search"
+                aria-label={t("header.clearSearch")}
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
               </button>

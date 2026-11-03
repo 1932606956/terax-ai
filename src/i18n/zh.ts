@@ -1,0 +1,143 @@
+const zh: Record<string, string> = {
+  // settings: general
+  "settings.general": "通用",
+  "settings.editor": "编辑器",
+  "settings.models": "模型",
+  "settings.agents": "Agent",
+  "settings.themes": "主题",
+  "settings.shortcuts": "快捷键",
+  "settings.about": "关于",
+
+  // command palette groups
+  "palette.group.general": "常规",
+  "palette.group.spaces": "空间",
+  "palette.group.tabs": "标签页",
+  "palette.group.panes": "窗格",
+  "palette.group.git": "Git",
+  "palette.group.search": "搜索",
+  "palette.group.view": "视图",
+  "palette.group.ai": "AI",
+
+  // command palette items
+  "palette.openSettings": "打开设置",
+  "palette.changeTheme": "更改主题...",
+  "palette.keyboardShortcuts": "键盘快捷键",
+  "palette.spacesOverview": "空间：总览",
+  "palette.newSpace": "新建空间",
+  "palette.switchTo": "切换到",
+  "palette.newTerminal": "新建终端",
+  "palette.newBlockTerminal": "新建块式终端",
+  "palette.newPrivateTerminal": "新建私密终端",
+  "palette.newEditorTab": "新建编辑器标签页",
+  "palette.newWebPreview": "新建网页预览",
+  "palette.closeTabOrPane": "关闭标签页或窗格",
+  "palette.splitPaneRight": "向右拆分窗格",
+  "palette.splitPaneDown": "向下拆分窗格",
+  "palette.openGitGraph": "打开 git 提交图",
+  "palette.toggleSourceControl": "切换源代码管理",
+  "palette.findContentInFiles": "在文件中查找内容",
+  "palette.searchCommandHistory": "搜索命令历史",
+  "palette.findInCurrentTab": "在当前标签页中查找",
+  "palette.searchFilesByName": "按名称搜索文件",
+  "palette.toggleFileExplorer": "切换文件资源管理器",
+  "palette.toggleHiddenFiles": "切换隐藏文件显示",
+  "palette.toggleAiAgent": "切换 AI 助手",
+  "palette.askAiAboutSelection": "就选中文本询问 AI",
+
+  // command palette disabled reasons
+  "palette.reason.noTerminalTab": "无终端标签页",
+  "palette.reason.paneLimit": "窗格已达上限",
+  "palette.reason.lastTab": "最后一个标签页",
+  "palette.reason.currentSpace": "当前空间",
+  "palette.reason.noWorkspaceRoot": "无工作区根目录",
+  "palette.reason.noSearchableView": "无可搜索视图",
+
+  // command palette component
+  "palette.title": "命令面板",
+  "palette.description": "运行命令、切换主题或搜索工作区。",
+  "palette.ph.searchThemes": "搜索主题...",
+  "palette.ph.findText": "在文件中查找文本...",
+  "palette.ph.searchHistory": "搜索命令历史...",
+  "palette.ph.default": "输入命令，> 查历史，# 在文件中查找",
+  "palette.noThemes": "没有主题",
+  "palette.typeAtLeast2": "至少输入 2 个字符",
+  "palette.noMatches": "无匹配结果",
+  "palette.heading.history": "命令历史",
+  "palette.openTerminalForHistory": "打开终端以运行历史",
+  "palette.noHistory": "暂无历史",
+  "palette.heading.searchModes": "搜索模式",
+  "palette.searchFailed": "搜索失败",
+  "palette.retry": "重试",
+  "palette.searching": "搜索中...",
+  "palette.noCommandsFound": "未找到命令。输入 ? 查看搜索模式。",
+
+  // sidebar rail
+  "sidebar.files": "文件",
+  "sidebar.git": "Git",
+
+  // tabs
+  "tabs.newTab": "新建标签页",
+  "tabs.terminal": "终端",
+  "tabs.blocks": "块式终端",
+  "tabs.agents": "Agent",
+  "tabs.privacy": "私密",
+  "tabs.editor": "编辑器",
+  "tabs.preview": "预览",
+  "tabs.gitGraph": "Git 提交图",
+  "tabs.unsavedChanges": "未保存的更改",
+  "tabs.closeTab": "关闭标签页",
+  "tabs.renameTab": "重命名标签页",
+
+  // header
+  "header.settings": "设置",
+  "header.toggleSidebar": "切换侧栏",
+  "header.commandPalette": "命令面板",
+  "header.search": "搜索",
+  "header.gitSearch": "Git 搜索",
+  "header.clearSearch": "清除搜索",
+
+  // toasts
+  "toast.closeWindowFailed": "无法关闭窗口",
+  "toast.saveChatFailed": "无法保存聊天记录",
+  "toast.loadChatFailed": "无法加载聊天记录",
+  "toast.micFailed": "麦克风访问失败",
+  "toast.migrateFailed": "部分聊天记录未能迁移",
+  "toast.migrateFailedDesc": "{n} 个会话将在下次启动时重试。",
+  "toast.saveConvFailed": "无法保存会话",
+  "toast.convDamaged": "一个会话文件已损坏",
+  "toast.convDamagedDesc": "该文件已被搁置，会话从空白开始。",
+  "toast.openConvFailed": "无法打开会话",
+  "toast.lspFormatFailed": "语言服务器格式化失败",
+  "toast.formatSkipped": "保存时跳过格式化",
+  "toast.formatSkippedNoFormatter":
+    "当前语言服务器没有格式化器。请在设置中选择外部格式化器（Python 用 Ruff、Prettier、rustfmt 等）。",
+  "toast.formatSkippedNoLsp":
+    "此文件没有活动的语言服务器。请在状态栏启用，或在设置中选择外部格式化器。",
+  "toast.fileChangedOnDisk": "文件已在磁盘上被修改",
+  "toast.fileChangedOnDiskDesc":
+    "{n} 在你有未保存更改时被其他程序修改。覆盖以保留你的版本。",
+  "toast.overwrite": "覆盖",
+  "toast.deleteFailed": "一个或多个条目删除失败",
+  "toast.closeDestFirst": "替换前请先关闭目标文件",
+  "toast.noGitRepo": "此文件夹不在任何 Git 仓库中。",
+  "toast.resolveGitFailed": "无法解析 Git 仓库",
+  "toast.searchBlockFailed": "无法搜索此块",
+  "toast.ptyPaused": "终端输出已暂停",
+
+  // tabs: language menu
+  "tabs.autoDetect": "自动检测",
+  "tabs.mode": "模式",
+  "tabs.fewerLanguages": "↑ 收起语言",
+  "tabs.allLanguages": "↓ 全部语言",
+  "tabs.rename": "重命名",
+  "tabs.close": "关闭",
+  "tabs.closeRight": "关闭右侧标签页",
+  "tabs.closeOthers": "关闭其他标签页",
+};
+
+export const dictionary: Readonly<Record<string, string>> = zh;
+
+export function t(key: string, arg?: string): string {
+  const template = zh[key] ?? key;
+  return arg === undefined ? template : template.replace("{n}", arg);
+}

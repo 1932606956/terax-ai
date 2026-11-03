@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import type { PaletteMode } from "../types";
 
 export type ParsedQuery = {
@@ -22,6 +23,6 @@ export function parseQuery(raw: string): ParsedQuery {
 }
 
 export const MODE_HINTS: ReadonlyArray<{ sigil: string; label: string }> = [
-  { sigil: ">", label: "Search command history" },
-  { sigil: "#", label: "Find text in files" },
+  { sigil: ">", label: t("palette.searchCommandHistory") },
+  { sigil: "#", label: t("palette.findContentInFiles") },
 ];
