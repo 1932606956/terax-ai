@@ -46,6 +46,11 @@ export type TerminalTab = TabBase & {
   blocks?: boolean;
   /** AI agent cannot read buffer / context of this terminal. */
   private?: boolean;
+  /**
+   * Locked tabs cannot be closed and keep their working directory: OSC 7 cwd
+   * updates and statusbar cd are ignored while locked.
+   */
+  locked?: boolean;
   /** User-set label that overrides the cwd-derived name. Survives cd. */
   customTitle?: string;
   /** User-set accent colour id (see TAB_COLORS). Survives cd. */
@@ -148,6 +153,8 @@ export type TabPatch = Partial<{
   /** Empty string clears the accent colour. */
   customColor: string;
   overrideLanguage: string | null;
+  /** Terminal tab only: prevents closing and pins the working directory. */
+  locked: boolean;
 }>;
 
 export type GitDiffOpenInput = {
@@ -395,6 +402,9 @@ export function planSingleTabClose(
   closingId: number,
   activeId: number,
 ): CloseTabsPlanResult | null {
+  // Locked tabs are close-protected; unlock first.
+  const closingTab = tabs.find((t) => t.id === closingId);
+  if (closingTab?.kind === "terminal" && closingTab.locked) return null;
   const fallback = nextActiveInSpace(tabs, closingId);
   if (fallback === null) return null;
   return applyCloseTabsPlan(tabs, fallback, {
@@ -412,11 +422,13 @@ export function applyCloseTabsPlan(
   if (!anchor) return null;
 
   const requested = new Set(plan.closeIds);
+  // Locked tabs survive "close others" / "close right" plans.
   const closing = tabs.filter(
     (tab) =>
       tab.id !== anchorId &&
       tab.spaceId === anchor.spaceId &&
-      requested.has(tab.id),
+      requested.has(tab.id) &&
+      !(tab.kind === "terminal" && tab.locked),
   );
   if (closing.length === 0) return null;
 
@@ -1211,7 +1223,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
             return {
               ...x,
               ...(patch.title !== undefined && { title: patch.title }),
-              ...(patch.cwd !== undefined && { cwd: patch.cwd }),
+              // A locked tab pins its working directory.
+              ...(patch.cwd !== undefined &&
+                !x.locked && { cwd: patch.cwd }),
               ...(patch.customColor !== undefined && {
                 customColor:
                   patch.customColor === "" ? undefined : patch.customColor,
@@ -1220,6 +1234,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
                 customTitle:
                   patch.customTitle === "" ? undefined : patch.customTitle,
               }),
+              ...(patch.locked !== undefined && { locked: patch.locked }),
             };
           }
           if (x.kind === "preview") {
@@ -1279,6 +1294,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         let changed = false;
         const next = curr.map((t) => {
           if (t.kind !== "terminal" || !hasLeaf(t.paneTree, leafId)) return t;
+          // A locked tab pins its working directory, including every leaf.
+          if (t.locked) return t;
           const paneTree = setLeafCwdInTree(t.paneTree, leafId, cwd);
           const isActive = t.activeLeafId === leafId;
           const cwdChanged = isActive && t.cwd !== cwd;
@@ -1299,6 +1316,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           if (t.id !== tabId || t.kind !== "terminal") return t;
           if (!hasLeaf(t.paneTree, leafId)) return t;
           if (t.activeLeafId === leafId) return t;
+          // A locked tab pins its cwd: switch focus without mirroring the
+          // pane's frozen cwd onto the tab.
+          if (t.locked) return { ...t, activeLeafId: leafId };
           const cwd = findLeafCwd(t.paneTree, leafId);
           return {
             ...t,
@@ -1318,6 +1338,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           if (t.id !== tabId || t.kind !== "terminal") return t;
           const next = nextLeafId(t.paneTree, t.activeLeafId, delta);
           if (next === t.activeLeafId) return t;
+          // A locked tab pins its cwd (see focusPane).
+          if (t.locked) return { ...t, activeLeafId: next };
           const cwd = findLeafCwd(t.paneTree, next);
           return {
             ...t,

@@ -4,6 +4,7 @@ import {
   disposeGhosttySession,
   focusGhosttySession,
   ghosttyFocusedLeaf,
+  ghosttyLeafAlternateScreen,
   ghosttyLeafHasForegroundProcess,
   ghosttyLeafIdForPty,
   ghosttyCwdForLeaf,
@@ -58,6 +59,12 @@ export function pasteIntoSession(leafId: number, text: string): boolean {
 
 export function leafCwd(leafId: number): string | null {
   return ghosttyCwdForLeaf(leafId);
+}
+
+/** Alternate-screen state of the focused terminal leaf; null = no TUI. */
+export function focusedLeafAlternateScreen(): boolean | null {
+  const leaf = ghosttyFocusedLeaf();
+  return leaf === null ? null : ghosttyLeafAlternateScreen(leaf);
 }
 
 export function navigateFocusedBlocks(direction: -1 | 1): boolean {

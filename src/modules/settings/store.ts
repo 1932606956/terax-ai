@@ -152,6 +152,7 @@ export type Preferences = {
   showHeaderSearch: boolean;
   explorerGitDecorations: boolean;
   terminalRenderer: "auto" | "webgl";
+  shortcutSuppression: "off" | "altScreen" | "always";
   terminalScreenReader: boolean;
   terminalCursorBlink: boolean;
   terminalCursorStyle: TerminalCursorStyle;
@@ -176,6 +177,8 @@ export type Preferences = {
   editorFormatter: EditorFormatter;
   /** languageResolver id -> formatter, overriding the global default. */
   editorFormatterByLang: Record<string, EditorFormatter>;
+  /** file extension (dot-less) -> external program name for "Open with". */
+  externalOpenByExt: Record<string, string>;
   /** Shell template for the "custom" formatter; {file} is the quoted path. */
   editorCustomFormatCommand: string;
   lspActivation: Record<string, LspActivation>;
@@ -253,6 +256,7 @@ const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
 const KEY_TERMINAL_SHELL = "terminalShell";
+const KEY_SHORTCUT_SUPPRESSION = "shortcutSuppression";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
 const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
@@ -269,6 +273,7 @@ const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
 const KEY_EDITOR_FORMAT_ON_SAVE = "editorFormatOnSave";
 const KEY_EDITOR_FORMATTER = "editorFormatter";
 const KEY_EDITOR_FORMATTER_BY_LANG = "editorFormatterByLang";
+const KEY_EXTERNAL_OPEN_BY_EXT = "externalOpenByExt";
 const KEY_EDITOR_CUSTOM_FORMAT_COMMAND = "editorCustomFormatCommand";
 const KEY_LSP_ACTIVATION = "lspActivation";
 const KEY_LSP_CUSTOM_SERVERS = "lspCustomServers";
@@ -340,6 +345,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showHeaderSearch: true,
   explorerGitDecorations: true,
   terminalRenderer: "auto",
+  shortcutSuppression: "off",
   terminalScreenReader: false,
   terminalCursorBlink: false,
   terminalCursorStyle: "bar",
@@ -362,6 +368,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorFormatOnSave: false,
   editorFormatter: "lsp",
   editorFormatterByLang: {},
+  /** file extension (dot-less) -> external program name for "Open with". */
+  externalOpenByExt: {},
   editorCustomFormatCommand: "",
   lspActivation: {},
   lspCustomServers: [],
@@ -506,6 +514,9 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.explorerGitDecorations,
     terminalRenderer:
       get<string>(KEY_TERMINAL_RENDERER) === "webgl" ? "webgl" : "auto",
+    shortcutSuppression: coerceShortcutSuppression(
+      get<unknown>(KEY_SHORTCUT_SUPPRESSION),
+    ),
     terminalScreenReader: get<boolean>(KEY_TERMINAL_SCREEN_READER) === true,
     terminalCursorBlink:
       get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
@@ -567,6 +578,9 @@ export async function loadPreferences(): Promise<Preferences> {
     editorFormatterByLang:
       get<Record<string, EditorFormatter>>(KEY_EDITOR_FORMATTER_BY_LANG) ??
       DEFAULT_PREFERENCES.editorFormatterByLang,
+    externalOpenByExt:
+      get<Record<string, string>>(KEY_EXTERNAL_OPEN_BY_EXT) ??
+      DEFAULT_PREFERENCES.externalOpenByExt,
     editorCustomFormatCommand:
       get<string>(KEY_EDITOR_CUSTOM_FORMAT_COMMAND) ??
       DEFAULT_PREFERENCES.editorCustomFormatCommand,
@@ -794,6 +808,42 @@ export async function setTerminalRenderer(
   await writePref(KEY_TERMINAL_RENDERER, value === "webgl" ? "webgl" : "auto");
 }
 
+const SHORTCUT_SUPPRESSION_VALUES: Record<string, true> = {
+  off: true,
+  altScreen: true,
+  always: true,
+};
+
+function coerceShortcutSuppression(
+  value: unknown,
+): "off" | "altScreen" | "always" {
+  return typeof value === "string" &&
+    SHORTCUT_SUPPRESSION_VALUES[value] === true
+    ? (value as "off" | "altScreen" | "always")
+    : DEFAULT_PREFERENCES.shortcutSuppression;
+}
+
+export async function setShortcutSuppression(
+  value: "off" | "altScreen" | "always",
+): Promise<void> {
+  await writePref(KEY_SHORTCUT_SUPPRESSION, coerceShortcutSuppression(value));
+}
+
+export async function setExternalOpenExt(
+  ext: string,
+  program: string | null,
+): Promise<void> {
+  const current =
+    ((await store.get(KEY_EXTERNAL_OPEN_BY_EXT)) as Record<
+      string,
+      string
+    >) ?? {};
+  const next = { ...current };
+  if (program === null || program === "") delete next[ext];
+  else next[ext] = program;
+  await writePref(KEY_EXTERNAL_OPEN_BY_EXT, next);
+}
+
 export async function setTerminalScreenReader(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_SCREEN_READER, value);
 }
@@ -981,6 +1031,7 @@ export async function onPreferencesChange(
     [KEY_SHOW_HEADER_SEARCH]: "showHeaderSearch",
     [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",
     [KEY_TERMINAL_RENDERER]: "terminalRenderer",
+    [KEY_SHORTCUT_SUPPRESSION]: "shortcutSuppression",
     [KEY_TERMINAL_SCREEN_READER]: "terminalScreenReader",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
@@ -1003,6 +1054,7 @@ export async function onPreferencesChange(
     [KEY_EDITOR_FORMAT_ON_SAVE]: "editorFormatOnSave",
     [KEY_EDITOR_FORMATTER]: "editorFormatter",
     [KEY_EDITOR_FORMATTER_BY_LANG]: "editorFormatterByLang",
+    [KEY_EXTERNAL_OPEN_BY_EXT]: "externalOpenByExt",
     [KEY_EDITOR_CUSTOM_FORMAT_COMMAND]: "editorCustomFormatCommand",
     [KEY_LSP_ACTIVATION]: "lspActivation",
     [KEY_LSP_CUSTOM_SERVERS]: "lspCustomServers",

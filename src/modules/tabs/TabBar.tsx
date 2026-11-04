@@ -8,7 +8,6 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { t as tr } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
@@ -30,6 +29,8 @@ import {
   GitCompareIcon,
   Globe02Icon,
   IncognitoIcon,
+  LockIcon,
+  LockOpenIcon,
   Message02Icon,
   PaintBoardIcon,
   PencilEdit02Icon,
@@ -65,6 +66,10 @@ function tabColorValue(id: string): string {
   return TAB_COLORS.find((c) => c.id === id)?.value ?? "";
 }
 
+function isLockedTab(tab: Tab): boolean {
+  return tab.kind === "terminal" && tab.locked === true;
+}
+
 type Props = {
   tabs: Tab[];
   activeId: number;
@@ -85,6 +90,8 @@ type Props = {
   onPin: (id: number) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
   onRename: (id: number, title: string) => void;
+  /** Toggle a terminal tab's lock: close-protected, cwd pinned. */
+  onLock: (id: number, locked: boolean) => void;
   onRecolor: (id: number, color: string) => void;
   /** Move a dragged tab to a new position (insertion gap index 0..tabs.length). */
   onReorder: (fromId: number, toGapIndex: number) => void;
@@ -107,6 +114,7 @@ export function TabBar({
   onCloseOtherTabs,
   onPin,
   onRename,
+  onLock,
   onRecolor,
   onReorder,
   compact,
@@ -332,7 +340,11 @@ export function TabBar({
                   onPointerCancel={(e) => endDrag(e.currentTarget)}
                   onDoubleClick={() => isPreview && onPin(t.id)}
                   onAuxClick={(e) => {
-                    if (e.button === 1 && tabs.length > 1) {
+                    if (
+                      e.button === 1 &&
+                      tabs.length > 1 &&
+                      !(t.kind === "terminal" && t.locked)
+                    ) {
                       e.preventDefault();
                       e.stopPropagation();
                       onClose(t.id);
@@ -402,7 +414,7 @@ export function TabBar({
                       />
                     ) : null}
                   </span>
-                  {tabs.length > 1 && (
+                  {!(t.kind === "terminal" && t.locked) && tabs.length > 1 && (
                     <span
                       role="button"
                       aria-label={tr("tabs.closeTab")}
@@ -428,10 +440,27 @@ export function TabBar({
                       />
                     </span>
                   )}
+                  {t.kind === "terminal" && t.locked && (
+                    <span
+                      aria-label={tr("tabs.locked")}
+                      title={tr("tabs.locked")}
+                      className="shrink-0 text-muted-foreground/70"
+                    >
+                      <HugeiconsIcon icon={LockIcon} size={10} strokeWidth={2} />
+                    </span>
+                  )}
                 </TabsTrigger>
               );
 
               const hasTabsToRight = i < tabs.length - 1;
+              // Close plans skip locked terminals; a menu entry whose whole
+              // candidate set is locked would silently do nothing.
+              const closableRight =
+                tabs.slice(i + 1).some((x) => !isLockedTab(x)) &&
+                hasTabsToRight;
+              const closableOthers = tabs.some(
+                (x) => x.id !== t.id && !isLockedTab(x),
+              );
 
               const tabNode = (
                 <ContextMenu>
@@ -442,6 +471,19 @@ export function TabBar({
                   >
                     {t.kind === "terminal" && (
                       <>
+                        <ContextMenuItem
+                          className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+                          onSelect={() => onLock(t.id, !t.locked)}
+                        >
+                          <HugeiconsIcon
+                            icon={t.locked ? LockOpenIcon : LockIcon}
+                            size={13}
+                            strokeWidth={1.75}
+                          />
+                          <span className="flex-1">
+                            {t.locked ? tr("tabs.unlock") : tr("tabs.lock")}
+                          </span>
+                        </ContextMenuItem>
                         <ContextMenuItem
                           className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
                           onSelect={() => setEditingId(t.id)}
@@ -488,7 +530,7 @@ export function TabBar({
                             ))}
                           </ContextMenuSubContent>
                         </ContextMenuSub>
-                        {tabs.length > 1 && (
+                        {tabs.length > 1 && !t.locked && (
                           <>
                             <ContextMenuSeparator />
                             <ContextMenuItem
@@ -508,7 +550,7 @@ export function TabBar({
                     )}
                     <ContextMenuItem
                       className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                      disabled={!hasTabsToRight}
+                      disabled={!closableRight}
                       onSelect={() => onCloseTabsToRight(t.id)}
                     >
                       <HugeiconsIcon
@@ -520,7 +562,7 @@ export function TabBar({
                     </ContextMenuItem>
                     <ContextMenuItem
                       className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                      disabled={tabs.length <= 1}
+                      disabled={!closableOthers}
                       onSelect={() => onCloseOtherTabs(t.id)}
                     >
                       <HugeiconsIcon

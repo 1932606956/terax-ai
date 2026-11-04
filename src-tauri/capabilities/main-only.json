@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-only",
+  "description": "Capabilities only the main window needs: opening files with external editors",
+  "windows": ["main"],
+  "permissions": ["opener:allow-open-path"]
+}

@@ -49,6 +49,7 @@ export const EXT_TO_LANGUAGE_ID: Record<string, string> = {
   fish: "shellscript",
   sql: "sql",
   xml: "xml",
+  ui: "xml",
   yaml: "yaml",
   yml: "yaml",
   toml: "toml",

@@ -22,6 +22,8 @@ type Props = {
   filePath?: string | null;
   home: string | null;
   onCd: (path: string) => void;
+  /** Active terminal tab is locked: its cwd cannot be changed. */
+  locked?: boolean;
   onWorkspaceChange: (env: WorkspaceEnv) => void;
   onOpenMini: () => void;
   /** Opens the panel, or Settings > Models when no API key is loaded. */
@@ -36,6 +38,7 @@ export function StatusBar({
   filePath,
   home,
   onCd,
+  locked,
   onWorkspaceChange,
   onOpenMini,
   onOpenAi,
@@ -48,7 +51,13 @@ export function StatusBar({
     <footer className="flex h-8 shrink-0 items-center justify-between gap-3 pl-3 pr-4 text-[11px]">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
-        <CwdBreadcrumb cwd={cwd} filePath={filePath} home={home} onCd={onCd} />
+        <CwdBreadcrumb
+          cwd={cwd}
+          filePath={filePath}
+          home={home}
+          onCd={onCd}
+          locked={locked}
+        />
         <LspStatusPill filePath={filePath ?? null} />
         <DiagnosticsBadge filePath={filePath ?? null} />
         {privateActive ? (

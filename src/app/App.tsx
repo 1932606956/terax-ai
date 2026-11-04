@@ -45,6 +45,7 @@ import {
   type SearchTarget,
 } from "@/modules/header";
 import { setLspNavigator } from "@/modules/lsp";
+import { usePeekStore } from "@/modules/peek/lib/peekStore";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -147,6 +148,12 @@ import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
 const BenchBridge = __TERAX_BENCH__
   ? lazy(() => import("@/bench/BenchBridge"))
   : null;
+
+// The peek card renders CodeMirror; it must stay out of the main window's
+// startup graph, so the component is loaded on first peek open.
+const PeekTabs = lazy(() =>
+  import("@/modules/peek/PeekTabs").then((m) => ({ default: m.PeekTabs })),
+);
 
 export default function App() {
   const {
@@ -651,12 +658,15 @@ export default function App() {
   const sendCd = useCallback(
     (path: string) => {
       if (activeLeafId === null) return;
+      // A locked tab pins its working directory; the statusbar path picker is
+      // disabled there instead of silently swallowing the cd.
+      if (activeTerminalTab?.locked) return;
       const term = terminalRefs.current.get(activeLeafId);
       if (!term) return;
       term.write(`cd ${quoteShellArg(path)}\r`);
       term.focus();
     },
-    [activeLeafId],
+    [activeLeafId, activeTerminalTab],
   );
 
   const cdInNewTab = useCallback(
@@ -677,10 +687,12 @@ export default function App() {
   const handleOpenFile = useCallback(
     (path: string, pin?: boolean) => {
       // Markdown opens in its rendered view by default; a per-tab toggle flips
-      // it to the raw editor. Other files default to preview (pin=false);
-      // explicit actions like context-menu "Open" pass pin=true to persist.
+      // it to the raw editor. Unpinned opens (file-tree single click) land in
+      // the peek card region with its own tab strip; explicit actions like the
+      // context-menu "Open" pass pin=true for a real top-bar tab.
       if (isMarkdownPath(path)) newMarkdownTab(path);
-      else openFileTab(path, pin ?? false);
+      else if (pin === true) openFileTab(path, true);
+      else usePeekStore.getState().open(path, activeSpaceIdRef.current);
     },
     [openFileTab, newMarkdownTab],
   );
@@ -736,6 +748,7 @@ export default function App() {
           title: i === -1 ? path : path.slice(i + 1),
         });
       }
+      usePeekStore.getState().renamePath(from, to);
     },
     [updateTab],
   );
@@ -865,6 +878,7 @@ export default function App() {
 
   const handleCloseTabOrPane = useCallback(() => {
     const t = tabsRef.current.find((x) => x.id === activeId);
+    if (t?.kind === "terminal" && t.locked) return;
     if (t?.kind === "terminal" && leafIds(t.paneTree).length > 1) {
       closeActivePane(activeId);
       return;
@@ -1143,6 +1157,11 @@ export default function App() {
     [updateTab],
   );
 
+  const handleLockTab = useCallback(
+    (id: number, locked: boolean) => updateTab(id, { locked }),
+    [updateTab],
+  );
+
   const searchTarget = useMemo<SearchTarget>(() => {
     if (isTerminalTab && activeLeafId !== null && activeSearchAddon)
       return {
@@ -1250,6 +1269,7 @@ export default function App() {
       onNewTabInSpace={handleNewTabInSpace}
       onJumpTab={jumpToTab}
       onCloseTab={handleClose}
+      onLockTab={handleLockTab}
       onMoveTabToSpace={handleMoveTab}
       onReorderTab={handleReorderTab}
       onReorderSpaces={(ids) => useSpaces.getState().reorder(ids)}
@@ -1435,6 +1455,7 @@ export default function App() {
               onCloseOtherTabs={handleCloseOtherTabs}
               onPin={pinTab}
               onRename={handleRenameTab}
+              onLock={handleLockTab}
               onRecolor={handleRecolorTab}
               onReorder={reorderTabByGap}
               onToggleSidebar={toggleSidebar}
@@ -1506,7 +1527,7 @@ export default function App() {
                           sourceControl={sourceControl}
                           onOpenDiff={openGitDiffTab}
                           onOpenGitGraph={openGitGraphFromContext}
-                          onOpenFile={handleOpenFile}
+                          onOpenFile={(path) => handleOpenFile(path, true)}
                           onNavigateToPath={cdInNewTab}
                           repositoryTarget={sourceControlRepositoryTarget}
                           onFollowRepositoryContext={
@@ -1548,6 +1569,9 @@ export default function App() {
                         onGitHistorySearchHandle={setGitHistoryHandle}
                         onSetMarkdownView={setMarkdownView}
                       />
+                      <Suspense fallback={null}>
+                        <PeekTabs activeSpaceId={activeSpaceId} />
+                      </Suspense>
                     </div>
 
                     <WorkspaceInputBar
@@ -1573,6 +1597,7 @@ export default function App() {
               filePath={activeFilePath}
               home={home}
               onCd={sendCd}
+              locked={activeTerminalTab?.locked === true}
               onWorkspaceChange={handleWorkspaceChange}
               onOpenMini={openMini}
               onOpenAi={togglePanelAndFocus}

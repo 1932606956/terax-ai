@@ -12,6 +12,7 @@ export {
 export {
   clearFocusedTerminal,
   disposeSession,
+  focusedLeafAlternateScreen,
   leafHasForegroundProcess,
   leafIdForPty,
   navigateFocusedBlocks,

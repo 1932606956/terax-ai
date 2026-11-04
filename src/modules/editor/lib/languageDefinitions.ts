@@ -341,6 +341,7 @@ export const LANGUAGES: LanguageDefinition[] = [
     name: "XML",
     extensions: [
       "xml",
+      "ui",
       "iml",
       "xsd",
       "xsl",

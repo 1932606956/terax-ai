@@ -46,6 +46,7 @@ import {
 } from "./lib/clipboardPaste";
 import {
   copyToClipboard,
+  openWithExternal,
   relativePath,
   revealInFinder,
 } from "./lib/contextActions";
@@ -235,6 +236,7 @@ export const FileExplorer = memo(
       canReplacePath,
       active: visible,
     });
+    const externalOpenByExt = usePreferencesStore((s) => s.externalOpenByExt);
     const gitDecorations = usePreferencesStore((s) => s.explorerGitDecorations);
     const { lookup: lookupGitStatus } = useGitStatus(
       rootPath,
@@ -420,6 +422,16 @@ export const FileExplorer = memo(
         }
       },
       [rootPath, workspace, tree.refresh],
+    );
+
+    // Dot-less lowercase extension of a filename, or "" when none.
+    const externalProgramFor = useCallback(
+      (name: string): string | undefined => {
+        const dot = name.lastIndexOf(".");
+        if (dot <= 0 || dot === name.length - 1) return undefined;
+        return externalOpenByExt[name.slice(dot + 1).toLowerCase()];
+      },
+      [externalOpenByExt],
     );
 
     useEffect(() => {
@@ -890,6 +902,22 @@ export const FileExplorer = memo(
                       onSelect={() => onOpenFile(menuTarget.path, true)}
                     >
                       {t("ctx.open")}
+                    </ContextMenuItem>
+                  )}
+                  {!menuTarget.isDir && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => {
+                        const program = externalProgramFor(menuTarget.name);
+                        void openWithExternal(menuTarget.path, program);
+                      }}
+                    >
+                      {externalProgramFor(menuTarget.name)
+                        ? t(
+                            "ctx.openWith",
+                            externalProgramFor(menuTarget.name) ?? "",
+                          )
+                        : t("ctx.openWithDefault")}
                     </ContextMenuItem>
                   )}
                   {menuTarget.isDir && onRevealInTerminal && (

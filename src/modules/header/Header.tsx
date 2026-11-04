@@ -46,6 +46,8 @@ type Props = {
   onPin: (id: number) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
   onRename: (id: number, title: string) => void;
+  /** Toggle a terminal tab's lock: close-protected, cwd pinned. */
+  onLock: (id: number, locked: boolean) => void;
   onRecolor: (id: number, color: string) => void;
   /** Move a dragged tab to a new position (insertion gap index). */
   onReorder: (fromId: number, toGapIndex: number) => void;
@@ -77,6 +79,7 @@ export function Header({
   onCloseOtherTabs,
   onPin,
   onRename,
+  onLock,
   onRecolor,
   onReorder,
   onToggleSidebar,
@@ -187,6 +190,7 @@ export function Header({
           onCloseOtherTabs={onCloseOtherTabs}
           onPin={onPin}
           onRename={onRename}
+          onLock={onLock}
           onRecolor={onRecolor}
           onReorder={onReorder}
           compact={compact}

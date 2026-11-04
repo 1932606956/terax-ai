@@ -7,6 +7,7 @@ import {
   hasCloseManyHazards,
   hasNewCloseManyHazards,
 } from "@/app/hooks/tabCloseGuards";
+import { usePeekStore } from "@/modules/peek/lib/peekStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type CloseTabsPlan,
@@ -107,10 +108,21 @@ export function useTabCloseGuards({
   );
 
   const planCloseMany = useCallback(
-    (kind: CloseManyKind, anchorId: number) =>
-      kind === "right"
-        ? planCloseTabsToRight(tabsRef.current, anchorId, activeIdRef.current)
-        : planCloseOtherTabs(tabsRef.current, anchorId, activeIdRef.current),
+    (kind: CloseManyKind, anchorId: number) => {
+      const plan =
+        kind === "right"
+          ? planCloseTabsToRight(tabsRef.current, anchorId, activeIdRef.current)
+          : planCloseOtherTabs(tabsRef.current, anchorId, activeIdRef.current);
+      // Locked tabs are filtered by applyCloseTabsPlan; drop them from the
+      // plan here too so hazard evaluation, dialog copy and the actual close
+      // all describe the same set of tabs.
+      const closable = tabsRef.current.filter(
+        (tab) =>
+          plan.closeIds.includes(tab.id) &&
+          !(tab.kind === "terminal" && tab.locked),
+      );
+      return { ...plan, closeIds: closable.map((tab) => tab.id) };
+    },
     [],
   );
 
@@ -212,6 +224,10 @@ export function useTabCloseGuards({
     (paths: string[]) => {
       const affected = deletedPathTabs(tabsRef.current, paths);
       disposeDeletedTabs(affected.cleanIds);
+      // Peek tabs for deleted files drop without a dirty dialog; the file is
+      // gone from disk either way, same as clean top-bar tabs.
+      const peek = usePeekStore.getState();
+      for (const p of paths) peek.removePath(p);
       if (affected.dirtyIds.length > 0) {
         setPendingDeleteTabs((current) => [
           ...new Set([...(current ?? []), ...affected.dirtyIds]),

@@ -32,6 +32,7 @@ import {
   setEditorFormatterByLang,
   setEditorWordWrap,
   setEditorWordWrapColumn,
+  setExternalOpenExt,
   setVimMode,
 } from "@/modules/settings/store";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -152,6 +153,10 @@ export function EditorSection() {
         )}
       </div>
 
+      <div className="flex flex-col gap-2">
+        <Label>{t("ed.externalOpen")}</Label>
+        <ExternalOpenOverrides />
+      </div>
       <LspServersGroup />
     </div>
   );
@@ -284,6 +289,98 @@ function FormatterOverrides() {
           </button>
         </div>
       ))}
+    </>
+  );
+}
+
+function ExternalOpenOverrides() {
+  const byExt = usePreferencesStore((s) => s.externalOpenByExt);
+  const entries = Object.entries(byExt);
+  const [newExt, setNewExt] = useState("");
+  const [newProgram, setNewProgram] = useState("");
+
+  const commit = (ext: string, program: string) => {
+    const key = ext.trim().toLowerCase().replace(/^\./, "");
+    if (!key) return;
+    void setExternalOpenExt(key, program.trim() || null);
+  };
+
+  const addRow = () => {
+    commit(newExt, newProgram);
+    setNewExt("");
+    setNewProgram("");
+  };
+
+  return (
+    <>
+      <SettingRow
+        title={t("ed.externalOpen")}
+        description={t("ed.externalOpenDesc")}
+      >
+        <button
+          type="button"
+          className="h-8 rounded-md border border-border px-3 text-[12px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+          disabled={!newExt.trim() || !newProgram.trim()}
+          onClick={addRow}
+        >
+          {t("ed.externalOpenAdd")}
+        </button>
+      </SettingRow>
+      {entries.map(([ext, program]) => (
+        <div
+          key={ext}
+          className="flex items-center justify-end gap-2 rounded-md border border-border/50 bg-muted/20 px-3 py-1.5"
+        >
+          <Input
+            defaultValue={ext}
+            className="h-7 w-24 font-mono text-[12px]"
+            onBlur={(e) => {
+              const next = e.target.value.trim().toLowerCase().replace(
+                /^\./,
+                "",
+              );
+              if (next === ext) return;
+              e.target.value = next;
+              void (async () => {
+                await setExternalOpenExt(ext, null);
+                if (next) await setExternalOpenExt(next, program);
+              })();
+            }}
+          />
+          <Input
+            defaultValue={program}
+            className="h-7 w-44 font-mono text-[12px]"
+            placeholder={t("ed.externalOpenProgramPlaceholder")}
+            onBlur={(e) => {
+              if (e.target.value === program) return;
+              commit(ext, e.target.value);
+            }}
+          />
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            title={t("ed.externalOpenRemove")}
+            onClick={() => void setExternalOpenExt(ext, null)}
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center justify-end gap-2 rounded-md border border-border/50 bg-muted/20 px-3 py-1.5">
+        <Input
+          value={newExt}
+          onChange={(e) => setNewExt(e.target.value)}
+          placeholder={t("ed.externalOpenExtPlaceholder")}
+          className="h-7 w-24 font-mono text-[12px]"
+        />
+        <Input
+          value={newProgram}
+          onChange={(e) => setNewProgram(e.target.value)}
+          placeholder={t("ed.externalOpenProgramPlaceholder")}
+          className="h-7 w-44 font-mono text-[12px]"
+        />
+        <span className="w-[18px]" />
+      </div>
     </>
   );
 }

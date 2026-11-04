@@ -26,7 +26,11 @@ import {
   useState,
 } from "react";
 import { FileIcon } from "./FileIcon";
-import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import {
+  copyToClipboard,
+  openWithExternal,
+  revealInFinder,
+} from "./lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 
 type SearchHit = {
@@ -46,7 +50,7 @@ const DEBOUNCE_MS = 300;
 
 type Props = {
   rootPath: string;
-  onOpenFile: (path: string) => void;
+  onOpenFile: (path: string, pin?: boolean) => void;
   open: boolean;
   onRequestClose: () => void;
   onActiveChange?: (active: boolean) => void;
@@ -77,6 +81,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(
     ref,
   ) {
     const showHidden = usePreferencesStore((s) => s.showHidden);
+    const externalOpenByExt = usePreferencesStore((s) => s.externalOpenByExt);
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SearchHit[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -244,6 +249,12 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(
               ) : (
                 results.map((hit, index) => {
                   const isSelected = index === selectedIndex;
+                  const extDot = hit.name.lastIndexOf(".");
+                  const ext =
+                    extDot > 0 && extDot < hit.name.length - 1
+                      ? hit.name.slice(extDot + 1).toLowerCase()
+                      : "";
+                  const program = externalOpenByExt[ext];
                   return (
                     <ContextMenu key={hit.path}>
                       <ContextMenuTrigger asChild>
@@ -287,9 +298,21 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(
                         {!hit.is_dir && (
                           <ContextMenuItem
                             className={COMPACT_ITEM}
-                            onSelect={() => onOpenFile(hit.path)}
+                            onSelect={() => onOpenFile(hit.path, true)}
                           >
-                            Open
+                            {t("ctx.open")}
+                          </ContextMenuItem>
+                        )}
+                        {!hit.is_dir && (
+                          <ContextMenuItem
+                            className={COMPACT_ITEM}
+                            onSelect={() =>
+                              void openWithExternal(hit.path, program)
+                            }
+                          >
+                            {program
+                              ? t("ctx.openWith", program)
+                              : t("ctx.openWithDefault")}
                           </ContextMenuItem>
                         )}
                         {hit.is_dir && onRevealInTerminal && (

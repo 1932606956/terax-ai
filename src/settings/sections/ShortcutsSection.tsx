@@ -11,9 +11,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { t } from "@/i18n/zh";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setShortcuts } from "@/modules/settings/store";
+import {
+  setShortcutSuppression,
+  setShortcuts,
+} from "@/modules/settings/store";
 import {
   getBindingTokens,
   type KeyBinding,
@@ -30,9 +40,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
+import { SettingRow } from "../components/SettingRow";
 
 export function ShortcutsSection() {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const suppression = usePreferencesStore((s) => s.shortcutSuppression);
   const [search, setSearch] = useState("");
   const [recordingId, setRecordingId] = useState<ShortcutId | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -89,6 +101,33 @@ export function ShortcutsSection() {
           Reset All
         </Button>
       </div>
+
+      <SettingRow
+        title={t("sc.suppression")}
+        description={t("sc.suppressionDesc")}
+      >
+        <Select
+          value={suppression}
+          onValueChange={(v) =>
+            void setShortcutSuppression(
+              v as "off" | "altScreen" | "always",
+            )
+          }
+        >
+          <SelectTrigger className="h-8 w-40 text-[12px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="off">{t("sc.suppression.off")}</SelectItem>
+            <SelectItem value="altScreen">
+              {t("sc.suppression.altScreen")}
+            </SelectItem>
+            <SelectItem value="always">
+              {t("sc.suppression.always")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingRow>
 
       <div className="relative">
         <HugeiconsIcon

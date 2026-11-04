@@ -6,12 +6,15 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useShortcutLabel } from "@/modules/shortcuts";
+import { t } from "@/i18n/zh";
 import { labelFor, type Tab, TabIcon } from "@/modules/tabs";
 import {
   ArrowDown01Icon,
   ArrowRight01Icon,
   Cancel01Icon,
   Delete02Icon,
+  LockIcon,
+  LockOpenIcon,
   PencilEdit02Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
@@ -33,6 +36,8 @@ type Props = {
   onNewTabInSpace: (spaceId: string) => void;
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
+  /** Toggle a terminal tab's lock: close-protected, cwd pinned. */
+  onLockTab: (id: number, locked: boolean) => void;
   onMoveTabToSpace: (tabId: number, spaceId: string) => void;
   onReorderTab: (
     tabId: number,
@@ -71,6 +76,10 @@ function subtitleFor(tab: Tab): string | null {
   return null;
 }
 
+function isLockedTab(tab: Tab): boolean {
+  return tab.kind === "terminal" && tab.locked === true;
+}
+
 export function SpaceSwitcher({
   open,
   onOpenChange,
@@ -80,6 +89,7 @@ export function SpaceSwitcher({
   onNewTabInSpace,
   onJumpTab,
   onCloseTab,
+  onLockTab,
   onMoveTabToSpace,
   onReorderTab,
   onReorderSpaces,
@@ -297,6 +307,7 @@ export function SpaceSwitcher({
               onNewTab={() => onNewTabInSpace(sp.id)}
               onJumpTab={onJumpTab}
               onCloseTab={onCloseTab}
+              onLockTab={onLockTab}
             />
           ))}
         </div>
@@ -359,6 +370,7 @@ type SpaceRowProps = {
   onNewTab: () => void;
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
+  onLockTab: (id: number, locked: boolean) => void;
 };
 
 function SpaceRow({
@@ -383,6 +395,7 @@ function SpaceRow({
   onNewTab,
   onJumpTab,
   onCloseTab,
+  onLockTab,
 }: SpaceRowProps) {
   const isDragging = dragging?.kind === "space" && dragging.id === space.id;
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
@@ -494,6 +507,7 @@ function SpaceRow({
               onPointerUp={onPointerUp}
               onJump={() => onJumpTab(t.id)}
               onClose={() => onCloseTab(t.id)}
+              onToggleLock={() => onLockTab(t.id, !isLockedTab(t))}
             />
           ))}
           {tabs.length === 0 && (
@@ -516,6 +530,7 @@ function TabRow({
   onPointerUp,
   onJump,
   onClose,
+  onToggleLock,
 }: {
   tab: Tab;
   dragging: { kind: "space" | "tab"; id: string | number } | null;
@@ -529,8 +544,10 @@ function TabRow({
   onPointerUp: (e: React.PointerEvent, onActivate?: () => void) => void;
   onJump: () => void;
   onClose: () => void;
+  onToggleLock: () => void;
 }) {
   const subtitle = subtitleFor(tab);
+  const locked = tab.kind === "terminal" && tab.locked;
   const isDragging = dragging?.kind === "tab" && dragging.id === tab.id;
   const reorderEdge =
     drop?.kind === "tab" && drop.tabId === tab.id ? drop.edge : null;
@@ -570,18 +587,50 @@ function TabRow({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          data-no-drag
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          aria-label="Close tab"
-          className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/tab:opacity-70 hover:opacity-100"
-        >
-          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-        </button>
+        {tab.kind === "terminal" && !locked && (
+          <button
+            type="button"
+            data-no-drag
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLock();
+            }}
+            aria-label={t("tabs.lock")}
+            title={t("tabs.lock")}
+            className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/tab:opacity-70 hover:opacity-100"
+          >
+            <HugeiconsIcon icon={LockOpenIcon} size={10} strokeWidth={2} />
+          </button>
+        )}
+        {tab.kind === "terminal" && locked && (
+          <button
+            type="button"
+            data-no-drag
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLock();
+            }}
+            aria-label={t("tabs.unlock")}
+            title={t("tabs.unlock")}
+            className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <HugeiconsIcon icon={LockIcon} size={10} strokeWidth={2} />
+          </button>
+        )}
+        {!locked && (
+          <button
+            type="button"
+            data-no-drag
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            aria-label="Close tab"
+            className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/tab:opacity-70 hover:opacity-100"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+          </button>
+        )}
       </div>
     </div>
   );

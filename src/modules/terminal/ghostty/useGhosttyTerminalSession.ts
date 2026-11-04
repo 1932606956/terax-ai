@@ -350,6 +350,17 @@ export function ghosttyFocusedLeaf(): number | null {
   return null;
 }
 
+/**
+ * Whether the leaf's terminal is on the alternate screen (vim, htop, ...).
+ * null when no live model is available, which callers treat as "not in a TUI"
+ * so a missing model never suppresses platform shortcuts.
+ */
+export function ghosttyLeafAlternateScreen(leafId: number): boolean | null {
+  const session = sessions.get(leafId);
+  if (!session?.model || session.disposed) return null;
+  return session.model.modes().alternateScreen;
+}
+
 export async function whenGhosttySessionReady(
   leafId: number,
 ): Promise<boolean> {

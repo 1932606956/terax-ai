@@ -1,3 +1,4 @@
+import { IS_WINDOWS } from "@/lib/platform";
 import type { LspCustomServer } from "@/modules/settings/store";
 
 export type LspPreset = {
@@ -116,7 +117,9 @@ export const LSP_PRESETS: LspPreset[] = [
       ".clangd",
     ],
     install: {
-      command: "brew install llvm",
+      command: IS_WINDOWS
+        ? "winget install LLVM.LLVM"
+        : "brew install llvm",
       docsUrl: "https://clangd.llvm.org/installation",
     },
   },

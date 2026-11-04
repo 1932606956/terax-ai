@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import {
   native,
   type GitRepoInfo,
@@ -185,7 +186,7 @@ function normalizeError(error: unknown): string {
     const message = (error as { message?: unknown }).message;
     if (typeof message === "string") return message;
   }
-  return "Unknown source control error";
+  return t("scm.unknownError");
 }
 
 function getContextualAction(

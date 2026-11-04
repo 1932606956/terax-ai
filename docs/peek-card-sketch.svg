@@ -1,0 +1,59 @@
+<svg viewBox="0 0 960 540" width="960" height="540" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <rect x="0" y="0" width="960" height="540" rx="10" fill="#141414" stroke="#333"/>
+
+  <!-- 顶栏 -->
+  <rect x="2" y="2" width="956" height="38" rx="10" fill="#1a1a1a"/>
+  <rect x="12" y="8" width="110" height="24" rx="6" fill="#242424" stroke="#3a3a3a"/>
+  <text x="67" y="24" text-anchor="middle" font-size="11" fill="#bbb">Rapid-Plugins ▾</text>
+  <rect x="130" y="8" width="70" height="24" rx="6" fill="#202020" stroke="#3a3a3a"/>
+  <text x="165" y="24" text-anchor="middle" font-size="11" fill="#ddd">MyProject</text>
+  <rect x="206" y="8" width="55" height="24" rx="6" fill="#202020" stroke="#3a3a3a"/>
+  <text x="233" y="24" text-anchor="middle" font-size="11" fill="#ddd">main</text>
+  <text x="948" y="24" text-anchor="end" font-size="14" fill="#888">＋▾</text>
+
+  <!-- 文件树 -->
+  <rect x="2" y="42" width="176" height="464" fill="#171717"/>
+  <text x="14" y="66" font-size="12" font-weight="bold" fill="#999">资源管理器</text>
+  <line x1="2" y1="74" x2="178" y2="74" stroke="#2a2a2a"/>
+  <text x="16" y="94" font-size="11" fill="#aaa">▾ 📁 rapid-plugins</text>
+  <rect x="26" y="102" width="140" height="18" rx="4" fill="#2d4a2d"/>
+  <text x="36" y="116" font-size="11" fill="#7ec87e">📄 main.cpp ←已选中</text>
+  <text x="36" y="140" font-size="11" fill="#aaa">📄 plugin.ui</text>
+  <text x="36" y="162" font-size="11" fill="#aaa">📄 CMakeLists.txt</text>
+  <text x="26" y="184" font-size="11" fill="#777">▸ 📁 tests</text>
+  <text x="14" y="480" font-size="10" fill="#555">单击文件 → 右侧卡片预览</text>
+
+  <!-- Peek 卡片 -->
+  <rect x="186" y="52" width="340" height="440" rx="10" fill="#1e1e1e" stroke="#4a7a4a" stroke-width="2"/>
+  <rect x="186" y="52" width="340" height="42" rx="10" fill="#252525"/>
+  <text x="200" y="72" font-size="13" font-weight="bold" fill="#eee">main.cpp</text>
+  <text x="200" y="88" font-size="9" fill="#777">rapid-plugins/main.cpp · 预览</text>
+  <rect x="474" y="58" width="22" height="22" rx="11" fill="#2a2a2a" stroke="#444"/>
+  <text x="485" y="73" text-anchor="middle" font-size="11" fill="#aaa">📌</text>
+  <rect x="474" y="84" width="22" height="22" rx="11" fill="#2a2a2a" stroke="#444"/>
+  <text x="485" y="100" text-anchor="middle" font-size="13" fill="#ccc">×</text>
+  <text x="485" y="122" text-anchor="middle" font-size="8" fill="#666">固定  关闭</text>
+
+  <text x="202" y="130" font-size="10" fill="#d7ba7d" font-family="Consolas, monospace">1  int main(int argc, char *argv[]) {</text>
+  <text x="216" y="148" font-size="10" fill="#9cdcfe" font-family="Consolas, monospace">2    QApplication app(argc, argv);</text>
+  <text x="216" y="166" font-size="10" fill="#4ec9b0" font-family="Consolas, monospace">3    MainWindow w;</text>
+  <text x="216" y="184" font-size="10" fill="#dcdcaa" font-family="Consolas, monospace">4    w.show();</text>
+  <text x="202" y="202" font-size="10" fill="#d7ba7d" font-family="Consolas, monospace">5    return app.exec();</text>
+  <text x="202" y="220" font-size="10" fill="#d7ba7d" font-family="Consolas, monospace">6  }</text>
+  <line x1="196" y1="470" x2="516" y2="470" stroke="#333"/>
+  <text x="356" y="486" text-anchor="middle" font-size="9" fill="#777">单击预览 · 编辑变脏自动升级为正式标签页 · Esc 关闭</text>
+
+  <!-- 终端区 -->
+  <text x="540" y="76" font-size="11" fill="#ddd" font-family="Consolas, monospace">PS D:\project\rapid-plugins&gt;</text>
+  <text x="540" y="96" font-size="11" fill="#ddd" font-family="Consolas, monospace">cmake --build .</text>
+  <text x="540" y="116" font-size="11" fill="#aaa" font-family="Consolas, monospace">[ 50%] Building CXX object CMakeFiles/app.dir/main.cpp.o</text>
+  <text x="540" y="136" font-size="11" fill="#7ec87e" font-family="Consolas, monospace">[100%] Built target app</text>
+  <text x="540" y="156" font-size="11" fill="#ddd" font-family="Consolas, monospace">█</text>
+  <text x="700" y="300" font-size="10" fill="#666">终端不被推开</text>
+  <text x="700" y="316" font-size="10" fill="#666">继续可见可交互</text>
+
+  <!-- 状态栏 -->
+  <rect x="2" y="508" width="956" height="30" fill="#1a1a1a"/>
+  <text x="14" y="527" font-size="11" fill="#aaa">D: ▸ project ▸ rapid-plugins</text>
+  <text x="948" y="527" text-anchor="end" font-size="11" fill="#aaa">AI ▴</text>
+</svg>

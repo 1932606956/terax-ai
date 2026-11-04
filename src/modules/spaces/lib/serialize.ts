@@ -20,6 +20,7 @@ export type SerializedTab =
       kind: "terminal";
       tree: SerializedNode;
       blocks?: boolean;
+      locked?: boolean;
       customTitle?: string;
       customColor?: string;
     }
@@ -76,6 +77,7 @@ function serializeTab(tab: Tab): SerializedTab | null {
         kind: "terminal",
         tree: serializeNode(tab.paneTree, tab.activeLeafId),
         ...(tab.blocks && { blocks: true }),
+        ...(tab.locked && { locked: true }),
         ...(tab.customTitle !== undefined && { customTitle: tab.customTitle }),
         ...(tab.customColor !== undefined && { customColor: tab.customColor }),
       };
@@ -164,6 +166,7 @@ function hydrateTab(
         paneTree: tree,
         activeLeafId,
         ...(s.blocks && { blocks: true }),
+        ...(s.locked && { locked: true }),
         ...(s.customTitle !== undefined && { customTitle: s.customTitle }),
         ...(s.customColor !== undefined && { customColor: s.customColor }),
       } satisfies TerminalTab;

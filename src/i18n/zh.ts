@@ -139,6 +139,9 @@ const zh: Record<string, string> = {
   "tabs.closeOthers": "关闭其他标签页",
   "tabs.color": "标签颜色",
   "tabs.colorNone": "无颜色",
+  "tabs.lock": "锁定标签页",
+  "tabs.unlock": "解锁标签页",
+  "tabs.locked": "标签页已锁定",
 
   // block terminal watermark (first-run hints)
   "watermark.history": "浏览命令历史",
@@ -302,6 +305,13 @@ const zh: Record<string, string> = {
   "ed.autoSaveDelayDesc": "未保存更改自动保存前的等待时间。",
   "ed.wrapColumn": "换行列数",
   "ed.wrapColumnDesc": "在此列软换行，编辑器较窄时会更早换行。",
+  "ed.externalOpen": "外部打开",
+  "ed.externalOpenDesc":
+    "按扩展名指定右键“用外部编辑器打开”时调用的程序；留空则用系统默认程序。",
+  "ed.externalOpenExtPlaceholder": "扩展名，如 ui",
+  "ed.externalOpenProgramPlaceholder": "程序名，如 designer",
+  "ed.externalOpenAdd": "添加映射",
+  "ed.externalOpenRemove": "移除映射",
 
   // settings: agents section
   "ag.title": "Agent",
@@ -355,6 +365,12 @@ const zh: Record<string, string> = {
   "sc.title": "快捷键",
   "sc.subtitle": "查看并自定义键盘快捷键。",
   "sc.search": "搜索快捷键...",
+  "sc.suppression": "TUI 程序按键优先",
+  "sc.suppressionDesc":
+    "终端里运行 vim、htop 等全屏程序时，让 Ctrl 组合键穿透给程序，而不是触发平台快捷键。",
+  "sc.suppression.off": "关闭（平台优先）",
+  "sc.suppression.altScreen": "TUI 自动（备屏时）",
+  "sc.suppression.always": "总是（终端聚焦时）",
   "sc.reset": "恢复默认",
   "sc.clear": "清除快捷键",
 
@@ -429,6 +445,9 @@ const zh: Record<string, string> = {
   "ctx.deleteNItems": "删除 {n} 项",
   "ctx.openDiff": "打开差异",
   "ctx.openFile": "打开文件",
+  "ctx.openWith": "用 {n} 打开",
+  "ctx.openWithDefault": "用系统默认程序打开",
+  "ctx.openExternalFailed": "调用外部程序失败",
 
   // source control panel
   "scm.stage": "暂存",
@@ -473,6 +492,37 @@ const zh: Record<string, string> = {
   "scm.discardOneBody": "放弃「{n}」中的更改？此操作无法撤销。",
   "scm.discard": "放弃",
   "scm.chars": "字符数",
+  "scm.repository": "仓库",
+  "scm.followActiveContext": "跟随活动上下文",
+  "scm.loadingBranches": "正在加载分支…",
+  "scm.localBranches": "本地分支",
+  "scm.worktrees": "工作树",
+  "scm.noBranches": "未找到分支。",
+  "scm.retry": "重试",
+  "scm.toCommit": "提交",
+  "scm.filesStaged": "已暂存 {n} 个文件",
+  "scm.changedFiles": "已更改的文件",
+  "scm.workingTreeClean": "工作区无更改",
+  "scm.onBranch": "当前分支：{n}",
+  "scm.divergedTitle": "分支已分叉",
+  "scm.divergedHint": "请在终端中处理",
+  "scm.discardFile": "放弃 {n}",
+  "scm.stageFile": "暂存 {n}",
+  "scm.stageToGenerate": "暂存更改后才能生成提交信息",
+  "scm.connectAiProvider": "连接 AI 提供方后才能生成提交信息",
+  "scm.waitAiAction": "请等待当前 AI 操作完成",
+  "scm.generateCommitMessage": "生成提交信息",
+  "scm.pushNeedUpstream": "请先在终端配置或发布此分支，以启用推送。",
+  "scm.pullBeforePush": "推送本地提交前请先拉取远程更改。",
+  "scm.noCommitsToPush": "没有可推送到 {n} 的本地提交。",
+  "scm.pushesTo": "将推送到 {n}。",
+  "scm.noStaged": "未暂存任何更改",
+  "scm.noUnstaged": "没有未暂存的更改",
+  "scm.invalidCommitMessage": "AI 返回了无效的提交信息，请重试或更换模型。",
+  "scm.committed": "已提交 {n}",
+  "scm.pushedTo": "已推送到 {n}",
+  "scm.pushCompleted": "推送完成",
+  "scm.unstagedFilesCount": "{n} 个未暂存文件",
 
   // shortcut action labels
   "sc.action.openCommandPalette": "打开命令面板",
@@ -641,6 +691,13 @@ const zh: Record<string, string> = {
   "chat.notif.failedTitle": "Terax 运行失败",
   "chat.notif.doneTitle": "Terax 已完成",
   "chat.notif.doneBody": "你的任务已就绪",
+
+  // peek card region (file tree clicks, own tab strip)
+  "peek.closeAll": "全部关闭",
+  "peek.dirtyTitle": "文件尚未保存",
+  "peek.dirtyBody": "「{n}」有未保存的更改，仍然关闭吗？",
+  "peek.dirtyBodyAll": "有未保存的更改，仍然全部关闭吗？",
+  "peek.dirtyConfirm": "仍然关闭",
 };
 
 export const dictionary: Readonly<Record<string, string>> = zh;

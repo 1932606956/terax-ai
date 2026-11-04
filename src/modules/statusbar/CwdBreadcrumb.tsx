@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { t } from "@/i18n/zh";
+import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import {
@@ -33,6 +34,8 @@ type Props = {
   filePath?: string | null;
   home: string | null;
   onCd: (path: string) => void;
+  /** A locked terminal tab pins its cwd: no segment may navigate. */
+  locked?: boolean;
 };
 
 function dirname(path: string): string {
@@ -52,7 +55,13 @@ function segmentLabel(segment: Segment): string {
   return segment.label;
 }
 
-export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
+export function CwdBreadcrumb({
+  cwd,
+  filePath,
+  home,
+  onCd,
+  locked = false,
+}: Props) {
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -63,13 +72,19 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
     return (
       <Breadcrumb>
         <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
-          {first ? <BreadcrumbSegment segment={first} onCd={onCd} /> : null}
+          {first ? (
+            <BreadcrumbSegment segment={first} onCd={onCd} locked={locked} />
+          ) : null}
           {middle.length > 0 ? (
-            <CollapsedSegments segments={middle} onCd={onCd} />
+            <CollapsedSegments
+              segments={middle}
+              onCd={onCd}
+              locked={locked}
+            />
           ) : null}
           {middle.map((s) => (
             <span key={s.fullPath} className="contents max-md:hidden">
-              <BreadcrumbSegment segment={s} onCd={onCd} />
+              <BreadcrumbSegment segment={s} onCd={onCd} locked={locked} />
             </span>
           ))}
           <BreadcrumbItem>
@@ -96,18 +111,30 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
     <Breadcrumb>
       <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
         {firstParent ? (
-          <BreadcrumbSegment segment={firstParent} onCd={onCd} />
+          <BreadcrumbSegment
+            segment={firstParent}
+            onCd={onCd}
+            locked={locked}
+          />
         ) : null}
         {middleParents.length > 0 ? (
-          <CollapsedSegments segments={middleParents} onCd={onCd} />
+          <CollapsedSegments
+            segments={middleParents}
+            onCd={onCd}
+            locked={locked}
+          />
         ) : null}
         {middleParents.map((s) => (
           <span key={s.fullPath} className="contents max-md:hidden">
-            <BreadcrumbSegment segment={s} onCd={onCd} />
+            <BreadcrumbSegment segment={s} onCd={onCd} locked={locked} />
           </span>
         ))}
         <BreadcrumbItem>
-          <CurrentSegmentDropdown segment={current} onCd={onCd} />
+          <CurrentSegmentDropdown
+            segment={current}
+            onCd={onCd}
+            locked={locked}
+          />
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
@@ -117,15 +144,39 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
 function BreadcrumbSegment({
   segment,
   onCd,
+  locked = false,
 }: {
   segment: Segment;
   onCd: (p: string) => void;
+  locked?: boolean;
 }) {
   const label = segmentLabel(segment);
   // The virtual "This PC" root is not a real directory: clicking it opens a
   // drive list instead of cd'ing to it (the shell has no such path).
   if (segment.isComputerRoot) {
-    return <ComputerRootSegment label={label} onCd={onCd} />;
+    return <ComputerRootSegment label={label} onCd={onCd} locked={locked} />;
+  }
+  if (locked) {
+    return (
+      <>
+        <BreadcrumbItem>
+          <Badge
+            variant="outline"
+            className="gap-1 cursor-default text-muted-foreground/60"
+          >
+            {segment.isHome ? (
+              <HugeiconsIcon
+                icon={Home03Icon}
+                className="size-3"
+                strokeWidth={1.75}
+              />
+            ) : null}
+            {label}
+          </Badge>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator className="[&>svg]:size-3" />
+      </>
+    );
   }
   return (
     <>
@@ -160,9 +211,11 @@ function BreadcrumbSegment({
 function ComputerRootSegment({
   label,
   onCd,
+  locked = false,
 }: {
   label: string;
   onCd: (p: string) => void;
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [drives, setDrives] = useState<string[] | null>(null);
@@ -177,6 +230,27 @@ function ComputerRootSegment({
         setDrives([]);
       });
   }, [open, drives]);
+
+  if (locked) {
+    return (
+      <>
+        <BreadcrumbItem>
+          <Badge
+            variant="outline"
+            className="gap-1 cursor-default text-muted-foreground/60"
+          >
+            <HugeiconsIcon
+              icon={ComputerIcon}
+              className="size-3"
+              strokeWidth={1.75}
+            />
+            {label}
+          </Badge>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator className="[&>svg]:size-3" />
+      </>
+    );
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -234,9 +308,11 @@ function ComputerRootSegment({
 function CurrentSegmentDropdown({
   segment,
   onCd,
+  locked = false,
 }: {
   segment: Segment;
   onCd: (p: string) => void;
+  locked?: boolean;
 }) {
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const [open, setOpen] = useState(false);
@@ -267,6 +343,34 @@ function CurrentSegmentDropdown({
   useEffect(() => {
     if (open) load();
   }, [open, load]);
+
+  if (locked) {
+    return (
+      <BreadcrumbPage className="flex cursor-default items-center gap-1 px-1 py-0.5 text-foreground/60">
+        {segment.isHome ? (
+          <>
+            <HugeiconsIcon
+              icon={Home03Icon}
+              className="size-3"
+              strokeWidth={1.75}
+            />
+            Home
+          </>
+        ) : segment.isComputerRoot ? (
+          <>
+            <HugeiconsIcon
+              icon={ComputerIcon}
+              className="size-3"
+              strokeWidth={1.75}
+            />
+            {label}
+          </>
+        ) : (
+          label
+        )}
+      </BreadcrumbPage>
+    );
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -338,9 +442,11 @@ function CurrentSegmentDropdown({
 function CollapsedSegments({
   segments,
   onCd,
+  locked = false,
 }: {
   segments: Segment[];
   onCd: (p: string) => void;
+  locked?: boolean;
 }) {
   return (
     <span className="contents md:hidden">
@@ -350,7 +456,13 @@ function CollapsedSegments({
             <button
               type="button"
               title="Show hidden folders"
-              className="flex items-center rounded-sm px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-disabled={locked}
+              className={cn(
+                "flex items-center rounded-sm px-1 text-muted-foreground",
+                locked
+                  ? "cursor-default opacity-60"
+                  : "hover:bg-accent hover:text-foreground",
+              )}
             >
               <HugeiconsIcon
                 icon={MoreHorizontalIcon}
@@ -364,6 +476,7 @@ function CollapsedSegments({
               s.isComputerRoot ? null : (
                 <DropdownMenuItem
                   key={s.fullPath}
+                  disabled={locked}
                   onSelect={() => onCd(s.fullPath)}
                 >
                   <HugeiconsIcon

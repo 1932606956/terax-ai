@@ -279,7 +279,7 @@ function BranchDropdown({
         {displayRepoRoot ? (
           <>
             <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-              Repository
+              {t("scm.repository")}
             </DropdownMenuLabel>
             <div
               className="truncate px-2 pb-1.5 text-[11px] text-muted-foreground"
@@ -295,7 +295,7 @@ function BranchDropdown({
                 }}
                 className="cursor-pointer text-[12px]"
               >
-                Follow Active Context
+                {t("scm.followActiveContext")}
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
@@ -304,7 +304,7 @@ function BranchDropdown({
         {loading ? (
           <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
             <Spinner className="size-3" />
-            Loading branches…
+            {t("scm.loadingBranches")}
           </div>
         ) : error ? (
           <div className="px-3 py-3 text-[11px] leading-snug text-destructive">
@@ -315,7 +315,7 @@ function BranchDropdown({
             {localBranches.length > 0 && (
               <>
                 <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-                  Local Branches
+                  {t("scm.localBranches")}
                 </DropdownMenuLabel>
                 <DropdownMenuGroup>
                   {localBranches.map((b) => (
@@ -344,7 +344,7 @@ function BranchDropdown({
               <>
                 {localBranches.length > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-                  Worktrees
+                  {t("scm.worktrees")}
                 </DropdownMenuLabel>
                 <DropdownMenuGroup>
                   {worktrees.map((b) => (
@@ -378,7 +378,7 @@ function BranchDropdown({
             )}
             {branches.length === 0 && (
               <div className="px-3 py-3 text-[11px] text-muted-foreground">
-                No branches found.
+                {t("scm.noBranches")}
               </div>
             )}
           </>
@@ -724,7 +724,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             ) : null}
             {scm.status?.isDetached ? (
               <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                detached
+                {t("scm.detached")}
               </span>
             ) : null}
           </div>
@@ -832,7 +832,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             body={scm.statusError ?? t("scm.unknownError")}
             action={
               <Button size="sm" onClick={() => void scm.refresh()}>
-                Retry
+                {t("scm.retry")}
               </Button>
             }
           />
@@ -862,10 +862,12 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <div className="pointer-events-none absolute inset-x-3 bottom-1.5 flex items-center justify-between p-1 gap-2 text-[10px] tabular-nums text-muted-foreground/55">
                   {scm.commitMessage.length > 0 ? (
-                    <span>Ch: {scm.commitMessage.length}</span>
+                    <span>
+                      {t("scm.chars")}: {scm.commitMessage.length}
+                    </span>
                   ) : (
                     <span className="flex gap-2 items-center">
-                      {commitShortcut} <p>to commit</p>
+                      {commitShortcut} <p>{t("scm.toCommit")}</p>
                     </span>
                   )}
                 </div>
@@ -921,7 +923,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 <span className="truncate font-medium text-foreground/85">
                   {stagedCount === 0
                     ? t("scm.nothingStaged")
-                    : `${stagedCount} ${stagedCount === 1 ? "file" : "files"} staged`}
+                    : t("scm.filesStaged", String(stagedCount))}
                 </span>
                 <span className="ml-auto shrink-0 truncate text-muted-foreground/65">
                   {pushStatusLabel}
@@ -990,7 +992,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 ref={containerRef}
                 tabIndex={0}
                 role="listbox"
-                aria-label="Changed files"
+                aria-label={t("scm.changedFiles")}
                 aria-activedescendant={
                   focusedRowKey ? `scm-row-${focusedRowKey}` : undefined
                 }
@@ -1112,10 +1114,10 @@ function CleanTreeHint({ repoLabel }: { repoLabel: string }) {
         />
       </div>
       <div className="text-[12px] font-medium text-foreground">
-        Working tree clean
+        {t("scm.workingTreeClean")}
       </div>
       <div className="text-[10.5px] leading-snug text-muted-foreground">
-        on <span className="font-mono text-foreground/80">{repoLabel}</span>
+        {t("scm.onBranch", repoLabel)}
       </div>
     </div>
   );
@@ -1159,9 +1161,9 @@ function DivergedBanner() {
       />
       <span className="min-w-0 flex-1 truncate">
         <span className="font-medium text-foreground/85">
-          Diverged from upstream
+          {t("scm.divergedTitle")}
         </span>
-        <span className="ml-1 opacity-75">— resolve in terminal</span>
+        <span className="ml-1 opacity-75">{t("scm.divergedHint")}</span>
       </span>
     </div>
   );
@@ -1289,7 +1291,7 @@ const EntryRow = memo(function EntryRow({
           {showDiscard ? (
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">
               <IconActionButton
-                label={`Discard ${entry.path}`}
+                label={t("scm.discardFile", entry.path)}
                 disabled={disabled}
                 side="top"
                 onClick={() => onDiscardFile(entry)}
@@ -1312,7 +1314,7 @@ const EntryRow = memo(function EntryRow({
               <Spinner className="size-3" />
             ) : (
               <Checkbox
-                aria-label={`Stage ${entry.path}`}
+                aria-label={t("scm.stageFile", entry.path)}
                 checked={checkboxValue(entry.checkState)}
                 disabled={disabled}
                 onCheckedChange={() => void onToggleStageFile(entry)}
