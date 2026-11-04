@@ -24,6 +24,7 @@ import {
   setDefaultWorkspaceEnv,
   setExplorerGitDecorations,
   setRestoreWindowState,
+  setShowHeaderSearch,
   setShowHidden,
   setTerminalCursorBlink,
   setTerminalCursorStyle,
@@ -94,6 +95,7 @@ export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const showHidden = usePreferencesStore((s) => s.showHidden);
+  const showHeaderSearch = usePreferencesStore((s) => s.showHeaderSearch);
   const explorerGitDecorations = usePreferencesStore(
     (s) => s.explorerGitDecorations,
   );
@@ -219,6 +221,18 @@ export function GeneralSection() {
             onValueChange={(v) => void setZoomLevel(v[0] ?? 1)}
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <SettingRow
+          title={t("gen.showHeaderSearch")}
+          description={t("gen.showHeaderSearchDesc")}
+        >
+          <Switch
+            checked={showHeaderSearch}
+            onCheckedChange={(v) => void setShowHeaderSearch(v)}
+          />
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { t } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown01Icon,
@@ -10,7 +11,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { usePlanStore, type QueuedEdit } from "../store/planStore";
+import { type QueuedEdit, usePlanStore } from "../store/planStore";
 
 function basename(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
@@ -85,7 +86,7 @@ export function PlanDiffReview() {
             disabled={busy}
           >
             <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} />
-            Apply {queue.length}
+            {t("chat.apply", String(queue.length))}
           </Button>
         </div>
       </div>
@@ -111,11 +112,7 @@ function PlanRow({
   const stats = isDir
     ? null
     : diffStats(item.originalContent, item.proposedContent);
-  const Icon = isDir
-    ? FolderAddIcon
-    : isNew
-      ? FilePlusIcon
-      : FileEditIcon;
+  const Icon = isDir ? FolderAddIcon : isNew ? FilePlusIcon : FileEditIcon;
 
   return (
     <li className="group/row overflow-hidden rounded-md border border-border/50 bg-card">
@@ -129,7 +126,7 @@ function PlanRow({
             open && "rotate-180",
             isDir && "invisible",
           )}
-          aria-label="Toggle diff"
+          aria-label={t("chat.toggleDiff")}
         >
           <HugeiconsIcon icon={ArrowDown01Icon} size={11} strokeWidth={1.75} />
         </button>
@@ -146,7 +143,7 @@ function PlanRow({
             </span>
             {isNew ? (
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                new
+                {t("chat.new")}
               </span>
             ) : null}
           </div>
@@ -165,7 +162,7 @@ function PlanRow({
             </div>
           ) : (
             <div className="mt-0.5 text-[10px] text-muted-foreground">
-              {item.description ?? "create directory"}
+              {item.description ?? t("chat.tool.mkdir")}
             </div>
           )}
         </div>
@@ -175,7 +172,7 @@ function PlanRow({
           variant="ghost"
           className="size-5 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100"
           onClick={onReject}
-          aria-label="Reject"
+          aria-label={t("chat.reject")}
         >
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={1.75} />
         </Button>

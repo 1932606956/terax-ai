@@ -41,7 +41,7 @@ describe("routeAgentNotification sound preference", () => {
       source: "terminal",
       agent: "codex",
       kind: "attention",
-      title: "Codex needs your input",
+      title: "Codex 需要你的输入",
       focused: false,
       visible: false,
       allowToast: true,
@@ -49,7 +49,9 @@ describe("routeAgentNotification sound preference", () => {
       leafId: 201,
       onActivate: vi.fn(),
     });
-    await vi.waitFor(() => expect(notifications.osNotify).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(notifications.osNotify).toHaveBeenCalledOnce(),
+    );
 
     expect(notifications.playSound).toHaveBeenCalledOnce();
   });
@@ -62,7 +64,7 @@ describe("routeAgentNotification sound preference", () => {
       source: "terminal",
       agent: "codex",
       kind: "attention",
-      title: "Codex needs your input",
+      title: "Codex 需要你的输入",
       focused: false,
       visible: false,
       allowToast: true,
@@ -70,7 +72,9 @@ describe("routeAgentNotification sound preference", () => {
       leafId: 202,
       onActivate: vi.fn(),
     });
-    await vi.waitFor(() => expect(notifications.osNotify).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(notifications.osNotify).toHaveBeenCalledOnce(),
+    );
 
     expect(notifications.pushNotification).toHaveBeenCalledOnce();
     expect(notifications.playSound).not.toHaveBeenCalled();
@@ -84,7 +88,7 @@ describe("routeAgentNotification sound preference", () => {
       source: "terminal",
       agent: "gemini",
       kind: "attention",
-      title: "Gemini needs your input",
+      title: "Gemini 需要你的输入",
       focused: true,
       visible: false,
       allowToast: true,

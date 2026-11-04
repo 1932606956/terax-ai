@@ -2,11 +2,11 @@ import { leafIds } from "@/modules/terminal";
 import { describe, expect, it } from "vitest";
 import {
   AGENT_LAUNCHERS,
+  type AgentInstanceCount,
   createAgentPanePlan,
   DEFAULT_AGENT_LAUNCH_COMMANDS,
   normalizeAgentLaunchCommands,
   validateAgentLaunchCommand,
-  type AgentInstanceCount,
 } from "./launcher";
 
 function allocator(start = 1) {
@@ -35,8 +35,9 @@ describe("agent launch commands", () => {
     expect(validateAgentLaunchCommand("codex\nwhoami")).toMatchObject({
       ok: false,
     });
-    expect(validateAgentLaunchCommand("x".repeat(257))).toMatchObject({
+    expect(validateAgentLaunchCommand("x".repeat(257))).toEqual({
       ok: false,
+      error: "命令长度请保持在 256 个字符以内。",
     });
   });
 

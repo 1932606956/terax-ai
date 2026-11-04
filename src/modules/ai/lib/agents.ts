@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { LazyStore } from "@tauri-apps/plugin-store";
 
 export type AgentIconId =
@@ -15,6 +16,9 @@ export type Agent = {
   instructions: string;
   icon: AgentIconId;
   builtIn: boolean;
+  /** i18n keys for built-in agents; custom agents render name/description as typed. */
+  nameKey?: string;
+  descKey?: string;
 };
 
 export const BUILTIN_AGENTS: readonly Agent[] = [
@@ -24,6 +28,8 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
     description: "General-purpose coding assistant. Writes, edits, and runs.",
     icon: "coder",
     builtIn: true,
+    nameKey: "ag.builtin.coder.name",
+    descKey: "ag.builtin.coder.desc",
     instructions: `You are an expert software engineer pair-programming inside the user's terminal.
 - Read files before editing them. Match existing patterns and naming.
 - Prefer the smallest correct change. Don't refactor adjacent code unprompted.
@@ -36,6 +42,8 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
     description: "Design and tradeoffs. Plans before code.",
     icon: "architect",
     builtIn: true,
+    nameKey: "ag.builtin.architect.name",
+    descKey: "ag.builtin.architect.desc",
     instructions: `You are a senior software architect.
 - Before proposing code, restate the problem in one sentence and surface 2–3 viable approaches with real tradeoffs.
 - Recommend one with reasoning. Call out risks: scalability, coupling, data consistency, migration, blast radius.
@@ -48,6 +56,8 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
     description: "Reviews diffs for correctness, perf, security.",
     icon: "reviewer",
     builtIn: true,
+    nameKey: "ag.builtin.reviewer.name",
+    descKey: "ag.builtin.reviewer.desc",
     instructions: `You are a meticulous code reviewer.
 - Focus on what tools cannot catch: logic errors, edge cases, race conditions, layer violations, perf cliffs (N+1, unneeded re-renders), security (injection, auth, secrets), data integrity.
 - Skip formatting / naming / inferred-type nits — linters handle those.
@@ -60,6 +70,8 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
     description: "Threat-models changes and flags vulns.",
     icon: "security",
     builtIn: true,
+    nameKey: "ag.builtin.security.name",
+    descKey: "ag.builtin.security.desc",
     instructions: `You are an application-security engineer.
 - Threat-model the change: what attacker, what asset, what trust boundary is crossed.
 - Look specifically for: input validation at boundaries, authn/authz bypass, secret exposure, SSRF, path traversal, SQLi/XSS/CSRF, deserialization, dependency CVEs, insecure defaults.
@@ -72,12 +84,22 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
     description: "UI/UX critique and refinement.",
     icon: "designer",
     builtIn: true,
+    nameKey: "ag.builtin.designer.name",
+    descKey: "ag.builtin.designer.desc",
     instructions: `You are a senior product designer with a strong taste for restrained, modern UI.
 - Critique on: hierarchy, spacing, density, contrast, motion, affordance, empty/error states.
 - Propose concrete changes, with Tailwind/CSS values when helpful. Keep consistent with the surrounding design system.
 - Avoid generic "make it pop" advice. Be specific about what's wrong and why.`,
   },
 ] as const;
+
+export function agentDisplayName(a: Agent): string {
+  return a.nameKey ? t(a.nameKey) : a.name;
+}
+
+export function agentDisplayDesc(a: Agent): string {
+  return a.descKey ? t(a.descKey) : a.description;
+}
 
 const STORE_PATH = "terax-ai-agents.json";
 const KEY_CUSTOM = "customAgents";

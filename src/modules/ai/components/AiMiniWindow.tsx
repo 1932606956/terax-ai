@@ -15,8 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { t } from "@/i18n/zh";
+import type { PresenceState } from "@/lib/usePresence";
 import { cn } from "@/lib/utils";
-import { useChat, type UIMessage } from "@ai-sdk/react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { type UIMessage, useChat } from "@ai-sdk/react";
 import {
   Add01Icon,
   AlertCircleIcon,
@@ -27,7 +30,6 @@ import {
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { PresenceState } from "@/lib/usePresence";
 import { useEffect, useMemo } from "react";
 import {
   endpointIdFromCompatModel,
@@ -41,9 +43,8 @@ import type { ResizeDir } from "../lib/miniWindowGeometry";
 import type { SessionMeta } from "../lib/sessions";
 import { useMiniWindowGeometry } from "../lib/useMiniWindowGeometry";
 import { useAgentsStore } from "../store/agentsStore";
-import { useChatStore } from "../store/chatStore";
 import { getOrCreateChat } from "../store/chatRuntime";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useChatStore } from "../store/chatStore";
 import { usePlanStore } from "../store/planStore";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { AiChatView } from "./AiChat";
@@ -52,22 +53,22 @@ import { TodoStrip } from "./TodoStrip";
 
 const SUGGESTIONS = [
   {
-    label: "Explain the last error",
-    hint: "Read the terminal buffer",
+    label: t("chat.suggest.explain.label"),
+    hint: t("chat.suggest.explain.hint"),
     icon: AlertCircleIcon,
-    text: "Explain the last error in the terminal.",
+    text: t("chat.suggest.explain.text"),
   },
   {
-    label: "Generate a command",
-    hint: "Tell me what you want to do",
+    label: t("chat.suggest.command.label"),
+    hint: t("chat.suggest.command.hint"),
     icon: TerminalIcon,
-    text: "Give me a command to ",
+    text: t("chat.suggest.command.text"),
   },
   {
-    label: "Summarize buffer",
-    hint: "Recap recent activity",
+    label: t("chat.suggest.summarize.label"),
+    hint: t("chat.suggest.summarize.hint"),
     icon: FilterIcon,
-    text: "Summarize what just happened in the terminal.",
+    text: t("chat.suggest.summarize.text"),
   },
 ];
 
@@ -160,7 +161,10 @@ function ResizeHandle({
     <div
       data-no-drag
       onPointerDown={onPointerDown}
-      className={cn("absolute z-50 touch-none select-none", RESIZE_HANDLE_CLASS[dir])}
+      className={cn(
+        "absolute z-50 touch-none select-none",
+        RESIZE_HANDLE_CLASS[dir],
+      )}
     />
   );
 }
@@ -227,9 +231,13 @@ function PlanModeStrip() {
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-muted/40 px-3 py-1.5">
       <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
-      <span className="text-[11px] font-medium text-foreground">Plan mode</span>
+      <span className="text-[11px] font-medium text-foreground">
+        {t("chat.planMode")}
+      </span>
       <span className="text-[11px] text-muted-foreground">
-        {queueLen > 0 ? `· ${queueLen} queued` : "· no edits queued"}
+        {queueLen > 0
+          ? t("chat.nQueued", String(queueLen))
+          : t("chat.noEditsQueued")}
       </span>
       <span className="flex-1" />
       <button
@@ -300,7 +308,9 @@ function Header({
         {isBusy ? (
           <span className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
             <Spinner className="size-2.5" />
-            <span className="max-w-32 truncate">{step ?? "Thinking…"}</span>
+            <span className="max-w-32 truncate">
+              {step ?? t("chat.thinking")}
+            </span>
           </span>
         ) : null}
         <SessionPicker />
@@ -310,8 +320,8 @@ function Header({
           variant="ghost"
           onClick={onClose}
           className="size-5"
-          aria-label="Close"
-          title="Close (Esc)"
+          aria-label={t("chat.close")}
+          title={t("chat.closeEsc")}
         >
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={1.75} />
         </Button>
@@ -385,18 +395,22 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
         <ContextContentHeader />
         <ContextContentBody>
           <div className="flex items-center justify-between text-muted-foreground">
-            <span>Model</span>
+            <span>{t("chat.model")}</span>
             <span className="font-mono text-foreground">{modelLabel}</span>
           </div>
           <div className="mt-1 flex items-center justify-between text-muted-foreground">
-            <span>{lastInput > 0 ? "Last request" : "Estimated context"}</span>
+            <span>
+              {lastInput > 0
+                ? t("chat.lastRequest")
+                : t("chat.estimatedContext")}
+            </span>
             <span className="font-mono text-foreground">
               {formatTokens(used)}
             </span>
           </div>
           {lastCached > 0 && (
             <div className="flex items-center justify-between text-muted-foreground">
-              <span>Of which cached</span>
+              <span>{t("chat.ofWhichCached")}</span>
               <span className="font-mono text-foreground">
                 {formatTokens(lastCached)}
               </span>
@@ -405,26 +419,28 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
           {reported > 0 && (
             <>
               <div className="mt-1.5 flex items-center justify-between text-muted-foreground">
-                <span>Session input</span>
+                <span>{t("chat.sessionInput")}</span>
                 <span className="font-mono text-foreground">
                   {formatTokens(tokens.inputTokens)}
                 </span>
               </div>
               <div className="flex items-center justify-between text-muted-foreground">
-                <span>Session output</span>
+                <span>{t("chat.sessionOutput")}</span>
                 <span className="font-mono text-foreground">
                   {formatTokens(tokens.outputTokens)}
                 </span>
               </div>
               {tokens.cachedInputTokens > 0 && (
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Cache hit</span>
-                  <span className="font-mono text-foreground">{cacheRate}%</span>
+                  <span>{t("chat.cacheHit")}</span>
+                  <span className="font-mono text-foreground">
+                    {cacheRate}%
+                  </span>
                 </div>
               )}
               {cost != null && (
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Session cost</span>
+                  <span>{t("chat.sessionCost")}</span>
                   <span className="font-mono text-foreground">
                     ${cost.toFixed(cost < 0.01 ? 4 : cost < 1 ? 3 : 2)}
                   </span>
@@ -433,7 +449,7 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
             </>
           )}
           <div className="flex items-center justify-between text-muted-foreground">
-            <span>Window</span>
+            <span>{t("chat.window")}</span>
             <span className="font-mono text-foreground">
               {formatTokens(max)}
             </span>
@@ -441,9 +457,7 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
         </ContextContentBody>
         <ContextContentFooter>
           <span className="text-[10px] italic text-muted-foreground">
-            {lastInput > 0
-              ? "Last request reflects current context size; session totals are cumulative."
-              : "Token count is approximate (chars / 4)."}
+            {lastInput > 0 ? t("chat.lastRequestHint") : t("chat.approxTokens")}
           </span>
         </ContextContentFooter>
       </ContextContent>
@@ -473,9 +487,9 @@ function SessionPicker() {
             "text-[11px] text-muted-foreground transition-colors",
             "hover:bg-accent hover:text-foreground",
           )}
-          title="Switch session"
+          title={t("chat.switchSession")}
         >
-          <span className="truncate">{active.title || "New chat"}</span>
+          <span className="truncate">{active.title || t("chat.newChat")}</span>
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={10}
@@ -535,7 +549,7 @@ function SessionRow({
       )}
     >
       <span className="min-w-0 flex-1 truncate">
-        {session.title || "New chat"}
+        {session.title || t("chat.newChat")}
       </span>
       <button
         type="button"
@@ -544,7 +558,7 @@ function SessionRow({
           e.stopPropagation();
           onDelete();
         }}
-        title="Delete session"
+        title={t("chat.deleteSession")}
         className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
       >
         <HugeiconsIcon icon={Delete02Icon} size={11} strokeWidth={1.75} />
@@ -559,10 +573,10 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
       <img src="/logo.png" alt="Terax" className="size-14 opacity-90" />
       <div className="space-y-1.5">
         <p className="text-[14px] font-semibold tracking-tight">
-          Ask Terax anything
+          {t("chat.askTitle")}
         </p>
         <p className="max-w-[18rem] text-[11.5px] leading-relaxed text-muted-foreground">
-          Terax sees the active terminal — cwd, recent commands, and output.
+          {t("chat.miniSees")}
         </p>
       </div>
       <div className="flex w-full flex-col gap-2.5">

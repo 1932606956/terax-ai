@@ -4,6 +4,7 @@ import { t } from "@/i18n/zh";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
 import {
@@ -87,6 +88,7 @@ export function Header({
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
+  const showHeaderSearch = usePreferencesStore((s) => s.showHeaderSearch);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -189,7 +191,9 @@ export function Header({
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
       </div>
 
-      <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
+      {showHeaderSearch && (
+        <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
+      )}
 
       {IS_MAC && (
         <>

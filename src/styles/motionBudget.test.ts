@@ -31,7 +31,6 @@ describe("global motion budget", () => {
     expect(names).toContain("--animate-spin");
     expect(names).toContain("--animate-pulse");
     expect(names).toContain("terax-shimmer");
-    expect(names).toContain("terax-blink");
   });
 
   it("pauses all animations while the window is inactive", () => {
@@ -51,6 +50,8 @@ describe("global motion budget", () => {
   it("removes the repeating indicators under prefers-reduced-motion", () => {
     const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion"));
     expect(reduced).toMatch(/\.terax-shimmer\s*\{[^}]*animation:\s*none/);
-    expect(reduced).toMatch(/\.terax-blink[^{]*\{[^}]*animation:\s*none/);
+    expect(reduced).toMatch(
+      /\.terax-attention-pulse[^{]*\{[^}]*animation:\s*none/,
+    );
   });
 });

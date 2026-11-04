@@ -265,6 +265,82 @@ pub fn subdirs(
     Ok(dirs)
 }
 
+/// Lists available drive roots in canonical form ("C:/", "D:/").
+/// Non-Windows platforms only ever expose "/".
+#[tauri::command]
+pub fn fs_list_drives() -> Vec<String> {
+    list_drives()
+}
+
+#[cfg(windows)]
+fn list_drives() -> Vec<String> {
+    use windows_sys::Win32::Storage::FileSystem::GetLogicalDriveStringsW;
+
+    let mut buf = [0u16; 256];
+    // SAFETY: `buf` is a valid writable buffer of `buf.len()` u16s; the API
+    // never writes past the passed length.
+    let len = unsafe { GetLogicalDriveStringsW(buf.len() as u32, buf.as_mut_ptr()) };
+    drive_strings_from_utf16(&buf[..len as usize])
+}
+
+#[cfg(not(windows))]
+fn list_drives() -> Vec<String> {
+    vec!["/".to_string()]
+}
+
+/// Parses the NUL-separated, double-NUL-terminated output of
+/// GetLogicalDriveStringsW into canonical ("C:/") paths.
+#[cfg(windows)]
+fn drive_strings_from_utf16(utf16: &[u16]) -> Vec<String> {
+    utf16
+        .split(|&c| c == 0)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let mut drive = String::from_utf16_lossy(s);
+            if drive.ends_with('\\') {
+                drive.pop();
+            }
+            drive.push('/');
+            drive
+        })
+        .collect()
+}
+
+#[cfg(test)]
+#[cfg(windows)]
+mod drive_tests {
+    use super::drive_strings_from_utf16;
+
+    fn enc(drives: &[&str]) -> Vec<u16> {
+        let mut out = Vec::new();
+        for d in drives {
+            out.extend(d.encode_utf16());
+            out.push(0);
+        }
+        out.push(0);
+        out
+    }
+
+    #[test]
+    fn parses_single_drive() {
+        assert_eq!(drive_strings_from_utf16(&enc(&["C:\\"])), vec!["C:/"]);
+    }
+
+    #[test]
+    fn parses_multiple_drives_in_order() {
+        assert_eq!(
+            drive_strings_from_utf16(&enc(&["C:\\", "D:\\", "E:\\"])),
+            vec!["C:/", "D:/", "E:/"],
+        );
+    }
+
+    #[test]
+    fn empty_buffer_yields_no_drives() {
+        assert_eq!(drive_strings_from_utf16(&[0]), Vec::<String>::new());
+        assert_eq!(drive_strings_from_utf16(&[]), Vec::<String>::new());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::natural_cmp;

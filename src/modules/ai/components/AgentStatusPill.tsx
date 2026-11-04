@@ -1,8 +1,9 @@
 import { Spinner } from "@/components/ui/spinner";
+import { t } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useChatStore, type AgentMeta } from "../store/chatStore";
+import { type AgentMeta, useChatStore } from "../store/chatStore";
 
 type Props = {
   onClick: () => void;
@@ -27,7 +28,7 @@ export function AgentStatusPill({ onClick }: Props) {
         "animate-in fade-in-0 slide-in-from-top-1 duration-150 ease-out",
         tone,
       )}
-      title="Open AI log"
+      title={t("chat.openAiLog")}
     >
       {icon}
       <span className="max-w-[180px] truncate">{label}</span>
@@ -42,8 +43,7 @@ function describe(meta: AgentMeta): {
 } {
   if (meta.status === "error") {
     return {
-      tone:
-        "border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15",
+      tone: "border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15",
       icon: (
         <HugeiconsIcon icon={AlertCircleIcon} size={12} strokeWidth={1.75} />
       ),
@@ -52,9 +52,8 @@ function describe(meta: AgentMeta): {
   }
   // thinking | streaming
   return {
-    tone:
-      "border-border/60 bg-card text-muted-foreground hover:text-foreground",
+    tone: "border-border/60 bg-card text-muted-foreground hover:text-foreground",
     icon: <Spinner className="size-3" />,
-    label: meta.step ?? "Thinking…",
+    label: meta.step ?? t("chat.thinking"),
   };
 }

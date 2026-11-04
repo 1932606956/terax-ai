@@ -14,6 +14,8 @@ import { AGENT_ICONS } from "@/modules/ai/components/AgentSwitcher";
 import {
   type Agent,
   type AgentIconId,
+  agentDisplayDesc,
+  agentDisplayName,
   BUILTIN_AGENTS,
 } from "@/modules/ai/lib/agents";
 import {
@@ -95,7 +97,7 @@ export function AgentsSection() {
             }
           >
             <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={1.75} />
-            New agent
+            {t("ag.newAgent")}
           </Button>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -117,11 +119,11 @@ export function AgentsSection() {
           <div className="flex flex-col">
             <Label>{t("ag.snippets")}</Label>
             <span className="text-[10.5px] text-muted-foreground">
-              Reusable instructions you can drop into any prompt with{" "}
+              {t("ag.snippetsHint")}
               <code className="rounded bg-muted/50 px-1 font-mono">
                 #handle
               </code>
-              .
+              {t("ag.snippetsHintSuffix")}
             </span>
           </div>
           <Button
@@ -252,15 +254,15 @@ function AgentCard({
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-1.5 text-[12.5px] font-medium">
-            {agent.name}
+            {agentDisplayName(agent)}
             {agent.builtIn ? (
               <span className="rounded bg-muted/50 px-1 py-0.5 text-[9px] tracking-wide text-muted-foreground uppercase">
-                Built-in
+                {t("ag.builtIn")}
               </span>
             ) : null}
           </span>
           <span className="line-clamp-2 text-[10.5px] leading-relaxed text-muted-foreground">
-            {agent.description}
+            {agentDisplayDesc(agent)}
           </span>
         </div>
       </div>
@@ -278,7 +280,7 @@ function AgentCard({
                 size={10}
                 strokeWidth={2}
               />
-              Active
+              {t("ag.active")}
             </>
           ) : (
             t("ag.useAgent")
@@ -401,14 +403,14 @@ function AgentEditorDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             size="sm"
             disabled={!canSave}
             onClick={() => onSave({ ...draft, builtIn: false })}
           >
-            Save
+            {t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -512,10 +514,10 @@ function SnippetEditorDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button size="sm" disabled={!canSave} onClick={() => onSave(draft)}>
-            Save
+            {t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -543,14 +545,14 @@ function CustomInstructionsBlock({ value }: { value: string }) {
         ) : null} */}
         {draft && (
           <Button size="xs" onClick={() => void setCustomInstructions(draft)}>
-            Save
+            {t("common.save")}
           </Button>
         )}
       </div>
       <Textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder="e.g. Always reply in concise bullet points. Prefer pnpm over npm. My machine is an M-series Mac."
+        placeholder={t("ag.customPlaceholder")}
         className="min-h-[100px] resize-y bg-card/60 font-sans text-[12px] leading-relaxed border border-border"
       />
     </div>

@@ -20,6 +20,10 @@ import {
   getAllCustomEndpointKeys,
   setCustomEndpointKey,
 } from "@/modules/ai/lib/keyring";
+import {
+  fetchEndpointModels,
+  type RemoteModel,
+} from "@/modules/ai/lib/modelList";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -28,7 +32,6 @@ import {
   setDefaultModel,
   setFavoriteModelIds,
   setRecentModelIds,
-  setWhispercppBaseURL,
 } from "@/modules/settings/store";
 import {
   Add01Icon,
@@ -36,7 +39,6 @@ import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
   ChevronDown,
-  Mic01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -176,8 +178,6 @@ export function ModelsSection() {
           </div>
         )}
       </div>
-
-      <VoiceBlock />
     </div>
   );
 }
@@ -294,6 +294,10 @@ function CustomEndpointCard({
     String(endpoint.contextLimit ?? ""),
   );
   const [keyDraft, setKeyDraft] = useState("");
+  const [modelsState, setModelsState] = useState<{
+    status: "idle" | "loading" | "ok" | "error";
+    models: RemoteModel[];
+  }>({ status: "idle", models: [] });
   const [testStatus, setTestStatus] = useState<
     "idle" | "testing" | "ok" | "fail"
   >("idle");
@@ -315,6 +319,17 @@ function CustomEndpointCard({
       setTestStatus(status > 0 ? "ok" : "fail");
     } catch {
       setTestStatus("fail");
+    }
+  };
+
+  const loadModels = async () => {
+    if (!urlDraft.trim()) return;
+    setModelsState({ status: "loading", models: [] });
+    try {
+      const models = await fetchEndpointModels(urlDraft, endpoint.id);
+      setModelsState({ status: "ok", models });
+    } catch {
+      setModelsState({ status: "error", models: [] });
     }
   };
 
@@ -412,17 +427,78 @@ function CustomEndpointCard({
           </FieldRow>
 
           <FieldRow label="Model ID">
-            <Input
-              value={modelDraft}
-              onChange={(e) => setModelDraft(e.target.value)}
-              onBlur={() => {
-                const v = modelDraft.trim();
-                if (v !== endpoint.modelId) void onUpdate({ modelId: v });
-              }}
-              placeholder="gpt-4o, qwen3-max, glm-4.6, …"
-              spellCheck={false}
-              className="h-8 font-mono text-[11.5px]"
-            />
+            <div className="flex flex-1 gap-1.5">
+              <Input
+                value={modelDraft}
+                onChange={(e) => setModelDraft(e.target.value)}
+                onBlur={() => {
+                  const v = modelDraft.trim();
+                  if (v !== endpoint.modelId) void onUpdate({ modelId: v });
+                }}
+                placeholder="gpt-4o, qwen3-max, glm-4.6, …"
+                spellCheck={false}
+                className="h-8 flex-1 font-mono text-[11.5px]"
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void loadModels()}
+                    disabled={!urlDraft.trim()}
+                    className="h-8 gap-1 px-3 text-[11px]"
+                  >
+                    <HugeiconsIcon
+                      icon={ArrowDown01Icon}
+                      size={12}
+                      strokeWidth={2}
+                    />
+                    {t("models.fetch")}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="max-h-72 min-w-60 overflow-y-auto p-1"
+                >
+                  {modelsState.status === "loading" && (
+                    <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                      {t("models.fetching")}
+                    </div>
+                  )}
+                  {modelsState.status === "error" && (
+                    <div className="px-2 py-1.5 text-[11px] text-destructive">
+                      {t("models.fetchFailed")}
+                    </div>
+                  )}
+                  {modelsState.status === "ok" &&
+                    modelsState.models.length === 0 && (
+                      <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                        {t("models.fetchEmpty")}
+                      </div>
+                    )}
+                  {modelsState.status === "ok" &&
+                    modelsState.models.map((m) => (
+                      <DropdownMenuItem
+                        key={m.id}
+                        onClick={() => {
+                          setModelDraft(m.id);
+                          const patch: Partial<CustomEndpoint> = {
+                            modelId: m.id,
+                          };
+                          if (m.contextLimit && m.contextLimit >= 1000) {
+                            patch.contextLimit = m.contextLimit;
+                            setContextDraft(String(m.contextLimit));
+                          }
+                          void onUpdate(patch);
+                        }}
+                        className="font-mono text-[11px]"
+                      >
+                        {m.id}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </FieldRow>
 
           <FieldRow label="Context">
@@ -431,7 +507,7 @@ function CustomEndpointCard({
                 value={contextDraft}
                 onChange={(e) => setContextDraft(e.target.value)}
                 onBlur={() => {
-                  const v = parseInt(contextDraft);
+                  const v = parseInt(contextDraft, 10);
                   if (Number.isFinite(v) && v >= 1000)
                     void onUpdate({ contextLimit: v });
                   else setContextDraft(String(endpoint.contextLimit ?? ""));
@@ -540,40 +616,6 @@ function StatusLine({
     <span className="text-[10.5px] text-destructive/80">
       Could not reach the server.
     </span>
-  );
-}
-
-function VoiceBlock() {
-  const whispercppBaseURL = usePreferencesStore((s) => s.whispercppBaseURL);
-  const [urlDraft, setUrlDraft] = useState(whispercppBaseURL);
-
-  useEffect(() => setUrlDraft(whispercppBaseURL), [whispercppBaseURL]);
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <HugeiconsIcon icon={Mic01Icon} size={15} strokeWidth={1.5} />
-        <span className="text-[12.5px] font-medium">{t("models.voice")}</span>
-      </div>
-
-      <p className="text-[10.5px] leading-relaxed text-muted-foreground">
-        {t("models.voiceHint")}
-      </p>
-
-      <FieldRow label={t("models.baseUrl")}>
-        <Input
-          value={urlDraft}
-          onChange={(e) => setUrlDraft(e.target.value)}
-          onBlur={() => {
-            const v = urlDraft.trim();
-            if (v !== whispercppBaseURL) void setWhispercppBaseURL(v);
-          }}
-          placeholder="http://127.0.0.1:8080"
-          spellCheck={false}
-          className="h-8 font-mono text-[11.5px]"
-        />
-      </FieldRow>
-    </div>
   );
 }
 
