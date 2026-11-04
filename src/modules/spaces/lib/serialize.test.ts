@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import type { PaneNode } from "@/modules/terminal/lib/panes";
 import type { Tab } from "@/modules/tabs/lib/useTabs";
-import { hydrateTabs, serializeTabs, type SerializedTab } from "./serialize";
+import type { PaneNode } from "@/modules/terminal/lib/panes";
+import { describe, expect, it } from "vitest";
+import { hydrateTabs, type SerializedTab, serializeTabs } from "./serialize";
 
 function counter(start = 100): () => number {
   let n = start;
@@ -91,6 +91,7 @@ describe("hydrateTabs", () => {
         activeLeafId: 12,
         blocks: true,
         customTitle: "x",
+        customColor: "blue",
       }),
     ];
     const serialized = serializeTabs(tabs);
@@ -102,6 +103,7 @@ describe("hydrateTabs", () => {
     expect(restored.cold).toBe(true);
     expect(restored.blocks).toBe(true);
     expect(restored.customTitle).toBe("x");
+    expect(restored.customColor).toBe("blue");
     expect(restored.paneTree.kind).toBe("split");
 
     const leaves = leafIdsOf(restored.paneTree);

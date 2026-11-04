@@ -14,7 +14,6 @@ import { isMarkdownPath } from "@/lib/utils";
 import {
   type AgentLaunchRequest,
   AgentNotificationsBridge,
-  findAgentLauncher,
   nextAttentionTarget,
   validateAgentLaunchCommand,
 } from "@/modules/agents";
@@ -615,17 +614,16 @@ export default function App() {
     (request: AgentLaunchRequest) => {
       const command = validateAgentLaunchCommand(request.command);
       if (!command.ok) return;
-      const launcher = findAgentLauncher(request.agent);
       const title =
         request.instances === 1
-          ? launcher.label
-          : `${launcher.label} × ${request.instances}`;
+          ? request.label
+          : `${request.label} × ${request.instances}`;
       const { leafIds: agentLeafIds } = newAgentGroupTab(
         inheritedCwdForNewTab(),
         title,
         request.instances,
       );
-      const hooksReady = launcher.supportsHooks
+      const hooksReady = request.supportsHooks
         ? invoke("agent_enable_hooks", {
             agent: request.agent,
           }).catch((error) => {
@@ -1140,6 +1138,11 @@ export default function App() {
     [updateTab],
   );
 
+  const handleRecolorTab = useCallback(
+    (id: number, color: string) => updateTab(id, { customColor: color }),
+    [updateTab],
+  );
+
   const searchTarget = useMemo<SearchTarget>(() => {
     if (isTerminalTab && activeLeafId !== null && activeSearchAddon)
       return {
@@ -1432,6 +1435,7 @@ export default function App() {
               onCloseOtherTabs={handleCloseOtherTabs}
               onPin={pinTab}
               onRename={handleRenameTab}
+              onRecolor={handleRecolorTab}
               onReorder={reorderTabByGap}
               onToggleSidebar={toggleSidebar}
               onOpenCommandPalette={() => openCommandPalette("commands")}

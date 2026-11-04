@@ -1,3 +1,4 @@
+import { t } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import { useShortcutLabel } from "@/modules/shortcuts";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -49,13 +50,13 @@ export function BlockWatermark({ leafId, subscribe }: Props) {
         className="size-24 rounded-3xl shadow-lg shadow-black/25"
       />
       <div className="grid grid-cols-[auto_auto] items-center gap-x-12 gap-y-3 text-[13px]">
-        <Hint label="Browse your command history" keys="↑" />
-        <Hint label="Autocomplete paths and commands" keys="Tab" />
+        <Hint label={t("watermark.history")} keys="↑" />
+        <Hint label={t("watermark.autocomplete")} keys="Tab" />
         <Hint
-          label="Switch between Shell and AI"
+          label={t("watermark.toggleInput")}
           shortcut="terminal.toggleInput"
         />
-        <Hint label="Open the AI assistant" shortcut="ai.toggle" />
+        <Hint label={t("watermark.aiAssistant")} shortcut="ai.toggle" />
       </div>
     </div>
   );

@@ -81,8 +81,32 @@ fn parse_launch_target() -> LaunchTarget {
     resolve_launch_target(entries)
 }
 
-const fn settings_always_on_top(is_macos: bool) -> bool {
-    !is_macos
+/// Records a panic's location before the release profile aborts the process:
+/// `panic = "abort"` swallows the message, which otherwise leaves only a bare
+/// exit code behind.
+fn install_panic_logger() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "unknown location".to_string());
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_default();
+        log::error!("panic at {location}: {message}");
+        default_hook(info);
+    }));
+}
+
+// Settings is a child of the main window, so the OS keeps it above Terax
+// without making it globally topmost: a topmost window would also cover every
+// other desktop app, which is not what a preferences dialog should do.
+const fn settings_always_on_top() -> bool {
+    false
 }
 
 #[tauri::command]
@@ -93,8 +117,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
     };
 
     if let Some(window) = app.get_webview_window("settings") {
-        #[cfg(not(target_os = "macos"))]
-        let _ = window.set_always_on_top(true);
+        let _ = window.set_always_on_top(settings_always_on_top());
         let _ = window.show();
         let _ = window.set_focus();
         if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
@@ -111,11 +134,13 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         .min_inner_size(820.0, 620.0)
         .resizable(true)
         .visible(false)
-        .always_on_top(settings_always_on_top(cfg!(target_os = "macos")));
+        .always_on_top(settings_always_on_top());
 
-    // A normal-level child stays above Terax but recedes with the app on macOS.
-    // Never combine the macOS parent with always_on_top; that breaks WebView
-    // compositing and can hide Settings behind the main window (#33, #957).
+    // A normal-level child stays above Terax but recedes with the app on macOS;
+    // on Windows the parent becomes the owner window, which keeps Settings
+    // above Terax without covering other apps. Never combine the parent with
+    // always_on_top: that breaks WebView compositing on macOS and can hide
+    // Settings behind the main window (#33, #957).
     let builder = if let Some(main) = app.get_webview_window("main") {
         builder.parent(&main).map_err(|e| e.to_string())?
     } else {
@@ -187,6 +212,7 @@ pub fn run() {
     let control_state = control::ControlState::default();
     let control_for_setup = control_state.clone();
 
+    install_panic_logger();
     let builder = tauri::Builder::default();
     let builder = builder.plugin(tauri_plugin_clipboard_manager::init());
     #[cfg(target_os = "macos")]
@@ -490,8 +516,9 @@ mod launch_target_tests {
     }
 
     #[test]
-    fn settings_float_only_outside_macos() {
-        assert!(!settings_always_on_top(true));
-        assert!(settings_always_on_top(false));
+    fn settings_is_never_globally_topmost() {
+        // Floating above Terax comes from the owner/parent relationship; a
+        // topmost flag would only add "above every other app".
+        assert!(!settings_always_on_top());
     }
 }

@@ -80,7 +80,8 @@ const NOTIF_LABEL: Record<AgentNotification["kind"], string> = {
   error: t("ag.notifFailed"),
 };
 
-const HOOK_AGENTS = ["claude", "codex", "gemini", "pi"] as const;
+// Only agents with a Rust-side hook installer can be enabled here.
+const HOOK_AGENTS = ["claude", "pi"] as const;
 
 function HookAgentRow({
   id,

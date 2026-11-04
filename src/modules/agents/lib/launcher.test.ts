@@ -1,11 +1,10 @@
 import { leafIds } from "@/modules/terminal";
 import { describe, expect, it } from "vitest";
 import {
-  AGENT_LAUNCHERS,
   type AgentInstanceCount,
   createAgentPanePlan,
-  DEFAULT_AGENT_LAUNCH_COMMANDS,
-  normalizeAgentLaunchCommands,
+  DEFAULT_AGENT_LAUNCHERS,
+  normalizeAgentLaunchers,
   validateAgentLaunchCommand,
 } from "./launcher";
 
@@ -14,25 +13,28 @@ function allocator(start = 1) {
   return () => id++;
 }
 
-describe("agent launch commands", () => {
-  it("defines a non-empty default for every launcher", () => {
-    for (const launcher of AGENT_LAUNCHERS) {
-      expect(DEFAULT_AGENT_LAUNCH_COMMANDS[launcher.id]).toBe(
-        launcher.defaultCommand,
-      );
+describe("agent launchers", () => {
+  it("ships only the two built-in agents, each with a command", () => {
+    expect(DEFAULT_AGENT_LAUNCHERS.map((a) => a.id)).toEqual([
+      "dsh-tui",
+      "oh-my-pi",
+    ]);
+    for (const launcher of DEFAULT_AGENT_LAUNCHERS) {
+      expect(launcher.command.trim().length).toBeGreaterThan(0);
+      expect(launcher.builtIn).toBe(true);
     }
   });
 
   it("accepts aliases and arguments while trimming whitespace", () => {
-    expect(validateAgentLaunchCommand("  cc --model opus  ")).toEqual({
+    expect(validateAgentLaunchCommand("  omp --model local  ")).toEqual({
       ok: true,
-      command: "cc --model opus",
+      command: "omp --model local",
     });
   });
 
   it("rejects blank, multiline, and oversized commands", () => {
     expect(validateAgentLaunchCommand(" ")).toMatchObject({ ok: false });
-    expect(validateAgentLaunchCommand("codex\nwhoami")).toMatchObject({
+    expect(validateAgentLaunchCommand("omp\nwhoami")).toMatchObject({
       ok: false,
     });
     expect(validateAgentLaunchCommand("x".repeat(257))).toEqual({
@@ -41,23 +43,39 @@ describe("agent launch commands", () => {
     });
   });
 
-  it("falls back per agent when persisted preferences are malformed", () => {
+  it("falls back to the built-ins when nothing usable is persisted", () => {
+    expect(normalizeAgentLaunchers(null).map((a) => a.id)).toEqual([
+      "dsh-tui",
+      "oh-my-pi",
+    ]);
     expect(
-      normalizeAgentLaunchCommands({
-        claude: "cc",
-        codex: "",
-        gemini: 42,
-        pi: "pi --provider local",
-        unknown: "ignored",
-      }),
-    ).toEqual({
-      claude: "cc",
-      codex: "codex",
-      gemini: "gemini",
-      pi: "pi --provider local",
-      opencode: "opencode",
-      grok: "grok",
+      normalizeAgentLaunchers([{ id: "x", command: "   " }]).map((a) => a.id),
+    ).toEqual(["dsh-tui", "oh-my-pi"]);
+  });
+
+  it("keeps user-added agents and their labels across a reload", () => {
+    const stored = [
+      { id: "dsh-tui", label: "dsh-tui", command: "dsh-tui" },
+      { id: "oh-my-pi", label: "oh-my-pi", command: "omp" },
+      { id: "custom-1", label: "My Agent", command: "my-agent --flag" },
+    ];
+    const out = normalizeAgentLaunchers(stored);
+    expect(out.map((a) => a.id)).toEqual(["dsh-tui", "oh-my-pi", "custom-1"]);
+    expect(out[2]).toMatchObject({
+      label: "My Agent",
+      command: "my-agent --flag",
+      builtIn: false,
     });
+  });
+
+  it("derives a label from the command and drops duplicate ids", () => {
+    const out = normalizeAgentLaunchers([
+      { id: "a", command: "first-word --x" },
+      { id: "a", command: "second" },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].label).toBe("first-word");
+    expect(out[0].builtIn).toBe(false);
   });
 });
 

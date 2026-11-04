@@ -137,7 +137,7 @@ function entryPathLabel(entry: SourceControlFileEntry): string {
 }
 
 function upstreamBadgeLabel(upstream: string | null | undefined): string {
-  if (!upstream) return "No upstream";
+  if (!upstream) return t("scm.noUpstream");
   return upstream;
 }
 
@@ -422,9 +422,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const panelState = fixedTargetPending ? "loading" : scm.panelState;
   const isRefreshing = panelState === "loading";
   const repoLabel = useMemo(() => {
-    if (fixedTargetPending) return "Loading";
-    if (!scm.status) return "Source Control";
-    return scm.status.isDetached ? "detached" : scm.status.branch;
+    if (fixedTargetPending) return t("scm.loading");
+    if (!scm.status) return t("scm.sourceControl");
+    return scm.status.isDetached ? t("scm.detached") : scm.status.branch;
   }, [fixedTargetPending, scm.status]);
 
   const commitShortcut = IS_MAC ? "⌘↩" : "Ctrl+Enter";
@@ -435,20 +435,20 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     !fixedTargetPending &&
     !scm.actionBusy;
   const commitDisabledReason = scm.actionBusy
-    ? "Wait for the current Git action to finish."
+    ? t("scm.waitAction")
     : scm.stagedEntries.length === 0
       ? t("scm.stageToCommit")
       : scm.commitMessage.trim().length === 0
         ? t("scm.enterMessage")
         : null;
   const commitHint = canCommit
-    ? `Commit with ${commitShortcut}.`
-    : (commitDisabledReason ?? `Commit with ${commitShortcut}.`);
+    ? t("scm.commitWith", commitShortcut)
+    : (commitDisabledReason ?? t("scm.commitWith", commitShortcut));
   const pushHint = scm.pushHint ?? t("scm.pushUnavailable");
   const pushDisabledReason = fixedTargetPending
-    ? "Wait for the selected repository to finish loading."
+    ? t("scm.waitLoading")
     : scm.actionBusy
-      ? "Wait for the current Git action to finish."
+      ? t("scm.waitAction")
       : pushHint;
   const stagedCount = scm.stagedEntries.length;
   const changedCount = scm.fileEntries.length;
@@ -750,12 +750,12 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 pullBusy
                   ? t("scm.pulling")
                   : isDiverged
-                    ? "Branch diverged — resolve in terminal"
+                    ? t("scm.diverged")
                     : !hasUpstream
-                      ? "No upstream configured"
+                      ? t("scm.noUpstreamConfigured")
                       : (scm.status?.behind ?? 0) === 0
-                        ? "Already up to date"
-                        : `Pull ${scm.status?.behind ?? 0} commits (fast-forward)`
+                        ? t("scm.upToDate")
+                        : t("scm.pullCommits", String(scm.status?.behind ?? 0))
               }
               disabled={!canPull}
               onClick={handlePull}
@@ -803,7 +803,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               strokeWidth={1.85}
               className="shrink-0"
             />
-            <span className="flex-1 text-[12px] font-medium">Commit Graph</span>
+            <span className="flex-1 text-[12px] font-medium">
+              {t("scm.commitGraph")}
+            </span>
             <HugeiconsIcon
               icon={ArrowRight01Icon}
               size={12}
@@ -814,20 +816,20 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         ) : null}
 
         {panelState === "loading" ? (
-          <PanelCenter title="Loading repository" />
+          <PanelCenter title={t("scm.loadingRepository")} />
         ) : null}
 
         {panelState === "no-repo" ? (
           <PanelCenter
-            title="No repository"
-            body="The active workspace is not inside a Git repository."
+            title={t("scm.noRepository")}
+            body={t("scm.noRepositoryBody")}
           />
         ) : null}
 
         {panelState === "error" ? (
           <PanelCenter
-            title="Source control error"
-            body={scm.statusError ?? "Unknown source control error"}
+            title={t("scm.error")}
+            body={scm.statusError ?? t("scm.unknownError")}
             action={
               <Button size="sm" onClick={() => void scm.refresh()}>
                 Retry
@@ -1054,21 +1056,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogTitle>{t("scm.discardTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {scm.pendingDiscard?.scope === "all"
-                ? `This will discard ${scm.pendingDiscard.label} and cannot be undone.`
+                ? t("scm.discardAllBody", scm.pendingDiscard.label)
                 : scm.pendingDiscard
-                  ? `Discard changes in "${scm.pendingDiscard.label}"? This cannot be undone.`
+                  ? t("scm.discardOneBody", scm.pendingDiscard.label)
                   : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => scm.cancelPendingDiscard()}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={() => void scm.confirmPendingDiscard()}>
-              Discard
+              {t("scm.discard")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1176,13 +1178,13 @@ function ListHeader({
   return (
     <div className="flex h-7 items-center gap-2 px-3">
       <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
-        Changes
+        {t("scm.changes")}
       </span>
       <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
         {row.count}
       </span>
       <label className="ml-auto flex shrink-0 cursor-pointer select-none items-center gap-1.5 text-[10.5px] font-medium text-muted-foreground hover:text-foreground">
-        <span>All</span>
+        <span>{t("scm.all")}</span>
         <Checkbox
           aria-label={t("scm.stageAll")}
           checked={checkboxValue(headerCheckState)}

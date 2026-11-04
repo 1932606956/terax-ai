@@ -1,6 +1,6 @@
-import { shallow } from "zustand/shallow";
-import { beforeEach, describe, expect, it } from "vitest";
 import { useAgentActivityStore } from "@/modules/terminal/lib/agentActivity";
+import { beforeEach, describe, expect, it } from "vitest";
+import { shallow } from "zustand/shallow";
 import { NO_AGENT_STATUS, selectTabAgentStatus } from "./tabAgentStatus";
 
 const select = (ptyIds: readonly number[]) =>

@@ -1,23 +1,23 @@
-export { TabBar, TabIcon } from "./TabBar";
-export { TabSwitcherHud } from "./TabSwitcherHud";
-export { useTabSwitcher } from "./lib/useTabSwitcher";
 export { labelFor } from "./lib/tabLabel";
+export { useTabSwitcher } from "./lib/useTabSwitcher";
 export {
-  MAX_PANES_PER_TAB,
-  useTabs,
-  nextActiveInSpace,
-  planCloseTabsToRight,
-  planCloseOtherTabs,
-  type CloseTabsPlan,
-  type Tab,
-  type EditorTab,
-  type PreviewTab,
-  type MarkdownTab,
+  type AiDiffStatus,
   type AiDiffTab,
+  type CloseTabsPlan,
+  type EditorTab,
+  type GitCommitFileDiffTab,
   type GitDiffTab,
   type GitHistoryTab,
-  type GitCommitFileDiffTab,
-  type AiDiffStatus,
+  MAX_PANES_PER_TAB,
+  type MarkdownTab,
+  nextActiveInSpace,
+  type PreviewTab,
+  planCloseOtherTabs,
+  planCloseTabsToRight,
+  type Tab,
+  useTabs,
 } from "./lib/useTabs";
-export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
 export { useWindowTitle } from "./lib/useWindowTitle";
+export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
+export { TabBar, TabIcon } from "./TabBar";
+export { TabSwitcherHud } from "./TabSwitcherHud";

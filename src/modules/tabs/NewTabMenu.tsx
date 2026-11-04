@@ -1,4 +1,3 @@
-import { t } from "@/i18n/zh";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +10,7 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "@/components/ui/popover";
+import { t } from "@/i18n/zh";
 import { fmtShortcut, MOD_KEY, SHIFT_KEY } from "@/lib/platform";
 import { AgentLauncherPanel } from "@/modules/agents/components/AgentLauncherPanel";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";

@@ -1,13 +1,13 @@
 const LABELS: Record<string, string> = {
-  claude: "Claude Code",
-  codex: "Codex",
-  gemini: "Gemini",
-  pi: "Pi",
-  opencode: "OpenCode",
-  grok: "Grok",
+  "dsh-tui": "dsh-tui",
+  "oh-my-pi": "oh-my-pi",
   terax: "Terax",
 };
 
+/**
+ * Display name for an agent id. Custom agents carry their own label, so this
+ * only covers the ids that reach notifications without one.
+ */
 export function displayAgent(agent: string): string {
   if (!agent) return "Agent";
   return (

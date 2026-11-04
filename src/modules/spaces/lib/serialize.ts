@@ -1,8 +1,3 @@
-import {
-  isLeaf,
-  type PaneNode,
-  type SplitDir,
-} from "@/modules/terminal/lib/panes";
 import type {
   EditorTab,
   MarkdownTab,
@@ -10,6 +5,11 @@ import type {
   Tab,
   TerminalTab,
 } from "@/modules/tabs/lib/useTabs";
+import {
+  isLeaf,
+  type PaneNode,
+  type SplitDir,
+} from "@/modules/terminal/lib/panes";
 
 type SerializedNode =
   | { kind: "leaf"; cwd?: string; active?: boolean }
@@ -21,6 +21,7 @@ export type SerializedTab =
       tree: SerializedNode;
       blocks?: boolean;
       customTitle?: string;
+      customColor?: string;
     }
   | { kind: "editor"; path: string }
   | { kind: "preview"; url: string }
@@ -76,6 +77,7 @@ function serializeTab(tab: Tab): SerializedTab | null {
         tree: serializeNode(tab.paneTree, tab.activeLeafId),
         ...(tab.blocks && { blocks: true }),
         ...(tab.customTitle !== undefined && { customTitle: tab.customTitle }),
+        ...(tab.customColor !== undefined && { customColor: tab.customColor }),
       };
     case "editor":
       return { kind: "editor", path: tab.path };
@@ -163,6 +165,7 @@ function hydrateTab(
         activeLeafId,
         ...(s.blocks && { blocks: true }),
         ...(s.customTitle !== undefined && { customTitle: s.customTitle }),
+        ...(s.customColor !== undefined && { customColor: s.customColor }),
       } satisfies TerminalTab;
     }
     case "editor":

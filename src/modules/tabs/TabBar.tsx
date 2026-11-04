@@ -3,6 +3,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {} from "@/components/ui/dropdown-menu";
@@ -28,6 +31,7 @@ import {
   Globe02Icon,
   IncognitoIcon,
   Message02Icon,
+  PaintBoardIcon,
   PencilEdit02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -41,9 +45,25 @@ import {
 } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { selectTabAgentStatus } from "./lib/tabAgentStatus";
-import { labelFor } from "./lib/tabLabel";
+import { labelFor, tooltipFor } from "./lib/tabLabel";
 import type { Tab, TerminalTab } from "./lib/useTabs";
 import { NewTabMenu } from "./NewTabMenu";
+
+/** Tab accent colours. Ids persist in the space file; values are css colours. */
+const TAB_COLORS = [
+  { id: "red", label: "红", value: "#ef4444" },
+  { id: "orange", label: "橙", value: "#f97316" },
+  { id: "amber", label: "琥珀", value: "#eab308" },
+  { id: "green", label: "绿", value: "#22c55e" },
+  { id: "teal", label: "青", value: "#14b8a6" },
+  { id: "blue", label: "蓝", value: "#3b82f6" },
+  { id: "violet", label: "紫", value: "#8b5cf6" },
+  { id: "pink", label: "粉", value: "#ec4899" },
+] as const;
+
+function tabColorValue(id: string): string {
+  return TAB_COLORS.find((c) => c.id === id)?.value ?? "";
+}
 
 type Props = {
   tabs: Tab[];
@@ -65,6 +85,7 @@ type Props = {
   onPin: (id: number) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
   onRename: (id: number, title: string) => void;
+  onRecolor: (id: number, color: string) => void;
   /** Move a dragged tab to a new position (insertion gap index 0..tabs.length). */
   onReorder: (fromId: number, toGapIndex: number) => void;
   compact?: boolean;
@@ -86,6 +107,7 @@ export function TabBar({
   onCloseOtherTabs,
   onPin,
   onRename,
+  onRecolor,
   onReorder,
   compact,
 }: Props) {
@@ -343,14 +365,31 @@ export function TabBar({
                         ? "px-2!"
                         : "ps-2! pe-1!",
                   )}
+                  style={
+                    t.kind === "terminal" && t.customColor
+                      ? ({
+                          "--tab-accent": tabColorValue(t.customColor),
+                        } as React.CSSProperties)
+                      : undefined
+                  }
                 >
                   <span
+                    title={tooltipFor(t)}
                     className={cn(
                       "flex min-w-0 items-center gap-1.5",
                       compact ? "max-w-48" : "max-w-80",
                     )}
                   >
                     <TabIcon tab={t} />
+                    {t.kind === "terminal" && t.customColor ? (
+                      <span
+                        aria-hidden
+                        className="size-1.5 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: tabColorValue(t.customColor),
+                        }}
+                      />
+                    ) : null}
                     {/* Preview tabs use italic to signal the transient state,
                         matching the visual convention from VSCode. */}
                     <span className={cn("truncate", isPreview && "italic")}>
@@ -414,6 +453,41 @@ export function TabBar({
                           />
                           <span className="flex-1">{tr("tabs.rename")}</span>
                         </ContextMenuItem>
+                        <ContextMenuSub>
+                          <ContextMenuSubTrigger className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]">
+                            <HugeiconsIcon
+                              icon={PaintBoardIcon}
+                              size={13}
+                              strokeWidth={1.75}
+                            />
+                            <span className="flex-1">{tr("tabs.color")}</span>
+                          </ContextMenuSubTrigger>
+                          <ContextMenuSubContent className="min-w-32 p-1">
+                            <ContextMenuItem
+                              className="gap-2 rounded-lg px-2 py-1.5 text-[12px]"
+                              onSelect={() => onRecolor(t.id, "")}
+                            >
+                              <span className="size-2 rounded-full border border-border" />
+                              <span className="flex-1">
+                                {tr("tabs.colorNone")}
+                              </span>
+                            </ContextMenuItem>
+                            {TAB_COLORS.map((color) => (
+                              <ContextMenuItem
+                                key={color.id}
+                                className="gap-2 rounded-lg px-2 py-1.5 text-[12px]"
+                                onSelect={() => onRecolor(t.id, color.id)}
+                              >
+                                <span
+                                  aria-hidden
+                                  className="size-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: color.value }}
+                                />
+                                <span className="flex-1">{color.label}</span>
+                              </ContextMenuItem>
+                            ))}
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
                         {tabs.length > 1 && (
                           <>
                             <ContextMenuSeparator />

@@ -1,6 +1,6 @@
-import { t } from "@/i18n/zh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { t } from "@/i18n/zh";
 import { KEY_SEP } from "@/lib/platform";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { usePreferencesStore } from "@/modules/settings/preferences";

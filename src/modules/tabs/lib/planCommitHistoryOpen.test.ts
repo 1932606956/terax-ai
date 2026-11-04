@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planCommitHistoryOpen, type GitHistoryTab, type Tab } from "./useTabs";
+import { type GitHistoryTab, planCommitHistoryOpen, type Tab } from "./useTabs";
 
 function history(
   id: number,
