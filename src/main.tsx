@@ -32,6 +32,13 @@ await invoke("pty_close_all").catch(() => {});
 // Seed before first paint so default tab mounts at target cwd (no flicker).
 await initLaunchDir();
 
+// Install the WebView2 selective context-menu filter (non-editable hits are
+// suppressed in favor of Terax's own menus; editable/selected text keeps the
+// native menu for copy/paste). One-shot at startup, no restore needed.
+void invoke("webview_install_context_menu").catch((e) =>
+  console.error("webview_install_context_menu failed:", e),
+);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <App />,
 );

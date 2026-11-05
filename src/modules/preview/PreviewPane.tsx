@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Alert02Icon,
@@ -58,21 +57,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
       return () => clearTimeout(t);
     }, [visible]);
 
-    // The iframe is cross-origin so its contextmenu events never reach us;
-    // suppress the WebView2 native menu while a preview page is showing.
-    // WebKit builds keep their menu (see webview_set_context_menu).
-    useEffect(() => {
-      if (!url || !visible || !loaded) return;
-      const ok = invoke("webview_set_context_menu", { enabled: false }).catch(
-        () => {},
-      );
-      return () => {
-        void ok.then(() =>
-          invoke("webview_set_context_menu", { enabled: true }).catch(() => {}),
-        );
-      };
-    }, [url, visible, loaded]);
-
+    // Selective suppression lives at the WebView2 level (see
+    // webview_install_context_menu, called once from main.tsx): the iframe is
+    // cross-origin so its contextmenu events never reach this page.
     useImperativeHandle(
       ref,
       () => ({

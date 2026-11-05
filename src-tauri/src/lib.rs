@@ -396,7 +396,7 @@ pub fn run() {
             vibrancy::window_backdrop_kind,
             vibrancy::window_set_backdrop,
             modules::window_presentation::window_presentation_state,
-            modules::window_presentation::webview_set_context_menu,
+            modules::window_presentation::webview_install_context_menu,
             #[cfg(feature = "bench")]
             modules::bench::bench_config,
             #[cfg(feature = "bench")]

@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { FileIcon } from "@/modules/explorer/FileIcon";
 import {
   Cancel01Icon,
-  Maximize02Icon,
-  Minimize02Icon,
+  SidebarLeft01Icon,
+  SidebarLeftIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -24,6 +24,16 @@ import { PeekEditor } from "./PeekEditor";
 const MIN_WIDTH_PCT = 20;
 const MAX_WIDTH_PCT = 75;
 const DEFAULT_WIDTH_PCT = 46;
+
+/**
+ * Row-relative card width in percent. The card is anchored to the row's left
+ * edge, so dragging the right handle right grows it: width = pointer - left.
+ */
+export function dragWidthPct(clientX: number, left: number, width: number) {
+  if (width <= 0) return null;
+  const pct = ((clientX - left) / width) * 100;
+  return Math.min(MAX_WIDTH_PCT, Math.max(MIN_WIDTH_PCT, pct));
+}
 
 function basename(path: string): string {
   const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
@@ -62,7 +72,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
     }
   }, [storeActiveSpaceId, activeSpaceId, clear]);
 
-  // Left-edge drag handle: window-level tracking. The percentage is of the
+  // Right-edge drag handle: window-level tracking. The percentage is of the
   // workspace row, so the terminal beside the card keeps the remaining width
   // rather than being overlapped. The card grows when the pointer moves right
   // (it is anchored to the row's left edge).
@@ -78,9 +88,8 @@ export function PeekTabs({ activeSpaceId }: Props) {
       const row = containerRef.current?.parentElement;
       if (!row) return;
       const rect = row.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setWidthPct(Math.min(MAX_WIDTH_PCT, Math.max(MIN_WIDTH_PCT, pct)));
+      const pct = dragWidthPct(e.clientX, rect.left, rect.width);
+      if (pct !== null) setWidthPct(pct);
     };
     const onUp = () => {
       draggingRef.current = false;
@@ -190,7 +199,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
             className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <HugeiconsIcon
-              icon={maximized ? Minimize02Icon : Maximize02Icon}
+              icon={maximized ? SidebarLeftIcon : SidebarLeft01Icon}
               size={12}
               strokeWidth={1.9}
             />
@@ -209,13 +218,13 @@ export function PeekTabs({ activeSpaceId }: Props) {
         ))}
       </div>
 
-      {/* Left-edge drag handle (4px); hidden while maximized */}
+      {/* Right-edge drag handle (4px); hidden while maximized */}
       {maximized ? null : (
         <div
           onPointerDown={() => {
             draggingRef.current = true;
           }}
-          className="absolute inset-y-0 left-0 w-1 cursor-col-resize hover:bg-border"
+          className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-border"
         />
       )}
 

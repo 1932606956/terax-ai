@@ -4944,6 +4944,7 @@ dependencies = [
  "webview2-com",
  "which",
  "window-vibrancy 0.6.0",
+ "windows",
  "windows-sys 0.61.2",
 ]
 
