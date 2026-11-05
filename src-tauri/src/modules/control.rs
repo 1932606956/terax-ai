@@ -566,7 +566,15 @@ fn generate_token() -> Result<String, String> {
     Ok(token)
 }
 
-fn descriptor_path() -> Result<PathBuf, String> {
+fn descriptor_dir() -> Result<PathBuf, String> {
+    // Isolated builds (smoke tests, second instances) set TERAX_CONTROL_DIR so
+    // they never displace the descriptor of the app the user is running.
+    if let Some(dir) = std::env::var_os("TERAX_CONTROL_DIR") {
+        let dir = PathBuf::from(dir);
+        std::fs::create_dir_all(&dir)
+            .map_err(|error| format!("create control directory {}: {error}", dir.display()))?;
+        return Ok(dir);
+    }
     let cache =
         dirs::cache_dir().ok_or_else(|| "could not resolve user cache directory".to_string())?;
     let dir = cache.join("terax");
@@ -578,7 +586,11 @@ fn descriptor_path() -> Result<PathBuf, String> {
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
             .map_err(|error| format!("secure control directory {}: {error}", dir.display()))?;
     }
-    Ok(dir.join("control.json"))
+    Ok(dir)
+}
+
+fn descriptor_path() -> Result<PathBuf, String> {
+    Ok(descriptor_dir()?.join("control.json"))
 }
 
 fn write_descriptor(path: &Path, descriptor: &ControlDescriptor) -> Result<(), String> {
