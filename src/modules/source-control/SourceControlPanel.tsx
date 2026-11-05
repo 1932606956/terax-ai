@@ -1138,8 +1138,40 @@ type RowRendererProps = {
   onOpenFile?: (absolutePath: string) => void;
 };
 
-const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
-  const { row } = props;
+/**
+ * Per-file line counts against HEAD, in the conventional green/red. Untracked
+ * files have no HEAD side, so they show nothing rather than a misleading +0.
+ * Hidden until the row is hovered or selected on narrow panels, where the
+ * counts would otherwise push the file name out.
+ */
+function DiffCounts({
+  insertions,
+  deletions,
+  label,
+}: {
+  insertions: number;
+  deletions: number;
+  label: string;
+}) {
+  if (insertions === 0 && deletions === 0) return null;
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1 font-mono text-[10.5px] tabular-nums"
+      aria-label={`${label} +${insertions} -${deletions}`}
+    >
+      {insertions > 0 ? (
+        <span className="text-emerald-600 dark:text-emerald-400">
+          +{insertions}
+        </span>
+      ) : null}
+      {deletions > 0 ? (
+        <span className="text-rose-600 dark:text-rose-400">-{deletions}</span>
+      ) : null}
+    </span>
+  );
+}
+
+const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {  const { row } = props;
   switch (row.kind) {
     case "banner-diverged":
       return <DivergedBanner />;
@@ -1287,6 +1319,12 @@ const EntryRow = memo(function EntryRow({
               ) : null}
             </div>
           </button>
+
+          <DiffCounts
+            insertions={entry.insertions}
+            deletions={entry.deletions}
+            label={fileName}
+          />
 
           {showDiscard ? (
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">

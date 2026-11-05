@@ -121,6 +121,8 @@ fn make_file(
         unstaged: is_unstaged(index_status, worktree_status),
         untracked: index_status == '?' && worktree_status == '?',
         status_label: status_label(index_status, worktree_status),
+        insertions: 0,
+        deletions: 0,
     }
 }
 

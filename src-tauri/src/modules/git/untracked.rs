@@ -44,6 +44,8 @@ fn file_entry(template: &GitChangedFile, path: String) -> GitChangedFile {
         unstaged: template.unstaged,
         untracked: true,
         status_label: template.status_label.clone(),
+        insertions: 0,
+        deletions: 0,
     }
 }
 
@@ -96,6 +98,8 @@ mod tests {
             unstaged: true,
             untracked: true,
             status_label: "Untracked".into(),
+            insertions: 0,
+            deletions: 0,
         }
     }
 

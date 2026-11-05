@@ -182,7 +182,6 @@ export default function App() {
     setMarkdownView,
     openAiDiffTab,
     closeAiDiffTab,
-    openGitDiffTab,
     openCommitHistoryTab,
     openCommitFileDiffTab,
     closeTab,
@@ -687,14 +686,35 @@ export default function App() {
   const handleOpenFile = useCallback(
     (path: string, pin?: boolean) => {
       // Markdown opens in its rendered view by default; a per-tab toggle flips
-      // it to the raw editor. Unpinned opens (file-tree single click) land in
-      // the peek card region with its own tab strip; explicit actions like the
-      // context-menu "Open" pass pin=true for a real top-bar tab.
+      // it to the raw editor. Every explorer and git entry lands in the peek
+      // card region, which owns file opening; `pin` is kept for the launch
+      // paths that restore a real workspace tab at startup.
       if (isMarkdownPath(path)) newMarkdownTab(path);
       else if (pin === true) openFileTab(path, true);
       else usePeekStore.getState().open(path, activeSpaceIdRef.current);
     },
     [openFileTab, newMarkdownTab],
+  );
+
+  const handleOpenPeekDiff = useCallback(
+    (input: {
+      path: string;
+      repoRoot: string;
+      mode: "+" | "-";
+      originalPath: string | null;
+    }) => {
+      usePeekStore.getState().openDiff(
+        {
+          kind: "working",
+          repoRoot: input.repoRoot,
+          path: input.path,
+          mode: input.mode,
+          originalPath: input.originalPath,
+        },
+        activeSpaceIdRef.current,
+      );
+    },
+    [],
   );
 
   const openLaunchFiles = useCallback(
@@ -1525,9 +1545,9 @@ export default function App() {
                         <SourceControlPanel
                           open
                           sourceControl={sourceControl}
-                          onOpenDiff={openGitDiffTab}
+                          onOpenDiff={handleOpenPeekDiff}
                           onOpenGitGraph={openGitGraphFromContext}
-                          onOpenFile={(path) => handleOpenFile(path, true)}
+                          onOpenFile={handleOpenFile}
                           onNavigateToPath={cdInNewTab}
                           repositoryTarget={sourceControlRepositoryTarget}
                           onFollowRepositoryContext={

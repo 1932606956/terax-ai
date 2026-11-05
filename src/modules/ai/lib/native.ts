@@ -54,6 +54,10 @@ export type GitChangedFile = {
   unstaged: boolean;
   untracked: boolean;
   statusLabel: string;
+  /** Lines added against HEAD; zero for untracked files and binary changes. */
+  insertions: number;
+  /** Lines removed against HEAD. */
+  deletions: number;
 };
 
 export type GitStatusSnapshot = {

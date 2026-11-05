@@ -8,9 +8,10 @@ use crate::modules::git::process::{
     read_text_file, run_git, run_git_capped,
 };
 use crate::modules::git::types::{
-    DiscardEntry, GitBranchEntry, GitBranchListResult, GitCommitFileChange, GitCommitResult,
-    GitDiffContentResult, GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult,
-    GitRepoInfo, GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    DiscardEntry, GitBranchEntry, GitBranchListResult, GitChangedFile, GitCommitFileChange,
+    GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot,
+    GitPushResult, GitRepoInfo, GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS,
+    NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::untracked;
 use crate::modules::git::utils::{
@@ -144,9 +145,10 @@ fn status_inner(repo_root: &ResolvedGitDirectory) -> Result<GitStatusSnapshot> {
 
     let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
     let parsed = parse_porcelain_v2(stdout);
-    let files = untracked::expand_untracked_dirs(parsed.files, |dir, budget| {
+    let mut files = untracked::expand_untracked_dirs(parsed.files, |dir, budget| {
         list_untracked_in(repo_root, dir, budget)
     });
+    apply_status_numstat(repo_root, &mut files);
 
     Ok(GitStatusSnapshot {
         repo_root: repo_root.git_path.clone(),
@@ -158,6 +160,79 @@ fn status_inner(repo_root: &ResolvedGitDirectory) -> Result<GitStatusSnapshot> {
         truncated: output.truncated,
         changed_files: files,
     })
+}
+
+/// Fills `insertions`/`deletions` on each tracked entry from one `git diff
+/// --numstat HEAD`, which covers staged and unstaged changes together. Untracked
+/// files stay at zero: they have no HEAD side to diff against, and counting
+/// them would mean reading every byte of a tree that may be huge. A failure
+/// here leaves the counts at zero rather than failing a status refresh the
+/// panel needs for everything else.
+fn apply_status_numstat(repo_root: &ResolvedGitDirectory, files: &mut [GitChangedFile]) {
+    if files.is_empty() {
+        return;
+    }
+    let output = match run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["diff", "--numstat", "-z", "--no-ext-diff", "HEAD"],
+        DEFAULT_TIMEOUT_SECS,
+    ) {
+        Ok(output) if output.exit_code == Some(0) => output,
+        _ => return,
+    };
+    let counts = parse_numstat(&output.stdout);
+    for file in files.iter_mut() {
+        if file.untracked {
+            continue;
+        }
+        let hit = counts.iter().find(|(path, _, _)| {
+            path == &file.path || file.original_path.as_deref() == Some(path.as_str())
+        });
+        if let Some((_, added, removed)) = hit {
+            file.insertions = *added;
+            file.deletions = *removed;
+        }
+    }
+}
+
+/// Parses `--numstat -z` output into (path, insertions, deletions). Binary
+/// files report "-" for both counts and keep zero, since no line count exists.
+fn parse_numstat(bytes: &[u8]) -> Vec<(String, u32, u32)> {
+    let mut out = Vec::new();
+    let mut rest = bytes;
+    while !rest.is_empty() {
+        let Some(tab1) = rest.iter().position(|b| *b == b'\t') else {
+            break;
+        };
+        let Some(rel) = rest.get(..tab1) else { break };
+        let Some(after) = rest.get(tab1 + 1..) else {
+            break;
+        };
+        let Some(tab2) = after.iter().position(|b| *b == b'\t') else {
+            break;
+        };
+        let Some(rem) = after.get(..tab2) else { break };
+        let Some(entry) = after.get(tab2 + 1..) else {
+            break;
+        };
+        let Some(nul) = entry.iter().position(|b| *b == 0) else {
+            break;
+        };
+        let path = String::from_utf8_lossy(&entry[..nul]).into_owned();
+        let added = parse_count(rel);
+        let removed = parse_count(rem);
+        out.push((path, added, removed));
+        rest = entry.get(nul + 1..).unwrap_or(&[]);
+    }
+    out
+}
+
+fn parse_count(raw: &[u8]) -> u32 {
+    std::str::from_utf8(raw)
+        .ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .unwrap_or(0)
 }
 
 /// Files git reports as untracked (and not ignored) under `dir`, or `None` when
@@ -1182,6 +1257,32 @@ pub fn checkout_branch(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_numstat_reads_counts_and_paths() {
+        let bytes = b"12\t3\tsrc/a.rs\0-\t-\tassets/logo.png\0";
+        assert_eq!(
+            parse_numstat(bytes),
+            vec![
+                ("src/a.rs".to_string(), 12, 3),
+                ("assets/logo.png".to_string(), 0, 0),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_numstat_keeps_spaces_in_paths() {
+        let bytes = b"1\t0\tmy dir/a b.txt\0";
+        assert_eq!(
+            parse_numstat(bytes),
+            vec![("my dir/a b.txt".to_string(), 1, 0)]
+        );
+    }
+
+    #[test]
+    fn parse_numstat_ignores_a_truncated_tail() {
+        assert_eq!(parse_numstat(b"12\t3"), Vec::new());
+    }
 
     #[test]
     fn sha_is_safe_accepts_hex() {

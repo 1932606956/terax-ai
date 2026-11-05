@@ -440,6 +440,7 @@ const zh: Record<string, string> = {
   "ctx.copyRelPath": "复制相对路径",
   "ctx.attachToAgent": "附加到 Agent",
   "ctx.refresh": "刷新",
+  "ctx.rename": "重命名",
   "ctx.delete": "删除",
   "ctx.confirmDelete": "再次点击确认删除",
   "ctx.deleteNItems": "删除 {n} 项",

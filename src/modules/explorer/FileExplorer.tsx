@@ -899,11 +899,17 @@ export const FileExplorer = memo(
                   {!menuTarget.isDir && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
-                      onSelect={() => onOpenFile(menuTarget.path, true)}
+                      onSelect={() => onOpenFile(menuTarget.path)}
                     >
                       {t("ctx.open")}
                     </ContextMenuItem>
                   )}
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => tree.beginRename(menuTarget.path)}
+                  >
+                    {t("ctx.rename")}
+                  </ContextMenuItem>
                   {!menuTarget.isDir && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
