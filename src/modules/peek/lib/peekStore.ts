@@ -66,6 +66,8 @@ type PeekState = {
   closeAll: () => boolean;
   /** Removes every tab regardless of dirty state. */
   clear: () => void;
+  /** Returns false when any OTHER tab is dirty and the caller must confirm first. */
+  closeOthers: (id: string) => boolean;
   setDirty: (id: string, dirty: boolean) => void;
   setActive: (id: string) => void;
   /** Mirror an explorer rename into the peek tab's path. */
@@ -134,6 +136,19 @@ export const usePeekStore = create<PeekState>((set) => ({
         activeId: s.activeId === id ? nextActive(s.tabs, id) : s.activeId,
       };
     }),
+  closeOthers: (id) => {
+    let blocked = false;
+    set((s) => {
+      const kept = s.tabs.find((t) => t.id === id);
+      if (!kept) return s;
+      if (s.tabs.some((t) => t.id !== id && t.dirty)) {
+        blocked = true;
+        return s;
+      }
+      return { tabs: [kept], activeId: id };
+    });
+    return !blocked;
+  },
   closeAll: () => {
     let blocked = false;
     set((s) => {

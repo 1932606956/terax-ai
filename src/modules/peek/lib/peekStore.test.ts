@@ -85,6 +85,46 @@ describe("peekStore", () => {
     expect(usePeekStore.getState().activeId).toBeNull();
   });
 
+  it("closeOthers keeps the target and closes clean others", () => {
+    const { open, closeOthers } = usePeekStore.getState();
+    open("a.ts", "s");
+    open("b.ts", "s");
+    open("c.ts", "s");
+    const kept = usePeekStore.getState().tabs[1].id;
+    expect(closeOthers(kept)).toBe(true);
+    const s = usePeekStore.getState();
+    expect(s.tabs).toHaveLength(1);
+    expect(s.tabs[0].id).toBe(kept);
+    expect(s.activeId).toBe(kept);
+  });
+
+  it("closeOthers blocks when another tab is dirty, leaving tabs unchanged", () => {
+    const { open, setDirty, closeOthers } = usePeekStore.getState();
+    open("a.ts", "s");
+    open("b.ts", "s");
+    open("c.ts", "s");
+    const before = usePeekStore.getState().tabs;
+    const kept = before[0].id;
+    setDirty(before[1].id, true);
+    expect(closeOthers(kept)).toBe(false);
+    const s = usePeekStore.getState();
+    expect(s.tabs).toHaveLength(3);
+    expect(s.tabs.map((t) => t.id)).toEqual(before.map((t) => t.id));
+  });
+
+  it("closeOthers ignores dirt on the kept tab alone", () => {
+    const { open, setDirty, closeOthers } = usePeekStore.getState();
+    open("a.ts", "s");
+    open("b.ts", "s");
+    const kept = usePeekStore.getState().tabs[0].id;
+    setDirty(kept, true);
+    expect(closeOthers(kept)).toBe(true);
+    const s = usePeekStore.getState();
+    expect(s.tabs).toHaveLength(1);
+    expect(s.tabs[0].id).toBe(kept);
+    expect(s.activeId).toBe(kept);
+  });
+
   it("setActive ignores unknown ids", () => {
     const { open, setActive } = usePeekStore.getState();
     open("a.ts", "s");
@@ -134,10 +174,12 @@ describe("peekStore", () => {
       originalPath: null,
     };
     usePeekStore.getState().openDiff(diff, "s");
-    usePeekStore.getState().openDiff(
-      { ...diff, kind: "working" as const, mode: "+" as const } as never,
-      "s",
-    );
+    usePeekStore
+      .getState()
+      .openDiff(
+        { ...diff, kind: "working" as const, mode: "+" as const } as never,
+        "s",
+      );
     usePeekStore.getState().openDiff(diff, "s");
     const s = usePeekStore.getState();
     expect(s.tabs).toHaveLength(2);

@@ -8,9 +8,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { t as tr } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import { FileIcon } from "@/modules/explorer/FileIcon";
+import {
+  COMPACT_CONTENT,
+  COMPACT_ITEM,
+} from "@/modules/explorer/lib/menuItemClass";
 import {
   Cancel01Icon,
   SidebarLeft01Icon,
@@ -63,6 +73,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
   const [maximized, setMaximized] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [confirmOthersId, setConfirmOthersId] = useState<string | null>(null);
   const draggingRef = useRef(false);
 
   // A peek area left over from a previous space must not linger over the
@@ -110,9 +121,12 @@ export function PeekTabs({ activeSpaceId }: Props) {
     },
     [close],
   );
-
   const requestCloseAll = useCallback(() => {
     if (!usePeekStore.getState().closeAll()) setConfirmAll(true);
+  }, []);
+
+  const requestCloseOthers = useCallback((id: string) => {
+    if (!usePeekStore.getState().closeOthers(id)) setConfirmOthersId(id);
   }, []);
 
   const confirmTab = usePeekStore((s) =>
@@ -133,51 +147,70 @@ export function PeekTabs({ activeSpaceId }: Props) {
           {tabs.map((tab) => {
             const active = tab.id === activeId;
             return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActive(tab.id)}
-                onMouseDown={(e) => {
-                  if (e.button === 1) {
-                    e.preventDefault();
-                    requestClose(tab.id);
-                  }
-                }}
-                className={cn(
-                  "group/tab relative flex shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs",
-                  "text-muted-foreground hover:bg-accent hover:text-foreground",
-                  active && "bg-accent text-foreground",
-                )}
-                title={tab.path}
-              >
-                <FileIcon
-                  name={basename(tab.path)}
-                  className="size-3.5 shrink-0 object-contain"
-                />
-                <span className="max-w-40 truncate">{basename(tab.path)}</span>
-                {tab.dirty && (
-                  <span
-                    className="size-1.5 shrink-0 rounded-full bg-foreground"
-                    aria-label="unsaved"
-                  />
-                )}
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  aria-label="close"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    requestClose(tab.id);
-                  }}
-                  className="flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-foreground/10"
-                >
-                  <HugeiconsIcon
-                    icon={Cancel01Icon}
-                    size={10}
-                    strokeWidth={2}
-                  />
-                </span>
-              </button>
+              <ContextMenu key={tab.id}>
+                <ContextMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setActive(tab.id)}
+                    onMouseDown={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        requestClose(tab.id);
+                      }
+                    }}
+                    className={cn(
+                      "group/tab relative flex shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs",
+                      "text-muted-foreground hover:bg-accent hover:text-foreground",
+                      active && "bg-accent text-foreground",
+                    )}
+                    title={tab.path}
+                  >
+                    <FileIcon
+                      name={basename(tab.path)}
+                      className="size-3.5 shrink-0 object-contain"
+                    />
+                    <span className="max-w-40 truncate">
+                      {basename(tab.path)}
+                    </span>
+                    {tab.dirty && (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full bg-foreground"
+                        aria-label="unsaved"
+                      />
+                    )}
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      aria-label="close"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestClose(tab.id);
+                      }}
+                      className="flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-foreground/10"
+                    >
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={10}
+                        strokeWidth={2}
+                      />
+                    </span>
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent className={COMPACT_CONTENT}>
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => requestCloseOthers(tab.id)}
+                  >
+                    {tr("peek.closeOthers")}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={requestCloseAll}
+                  >
+                    {tr("peek.closeAll")}
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           })}
         </div>
@@ -229,11 +262,12 @@ export function PeekTabs({ activeSpaceId }: Props) {
       )}
 
       <AlertDialog
-        open={confirmId !== null || confirmAll}
+        open={confirmId !== null || confirmAll || confirmOthersId !== null}
         onOpenChange={(openState) => {
           if (!openState) {
             setConfirmId(null);
             setConfirmAll(false);
+            setConfirmOthersId(null);
           }
         }}
       >
@@ -241,7 +275,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>{tr("peek.dirtyTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAll
+              {confirmAll || confirmOthersId !== null
                 ? tr("peek.dirtyBodyAll")
                 : tr(
                     "peek.dirtyBody",
@@ -254,9 +288,16 @@ export function PeekTabs({ activeSpaceId }: Props) {
             <AlertDialogAction
               onClick={() => {
                 if (confirmAll) clear();
-                else if (confirmId != null) forceClose(confirmId);
+                else if (confirmOthersId != null) {
+                  // Confirmed: drop every tab except the kept one.
+                  usePeekStore.setState((s) => ({
+                    tabs: s.tabs.filter((t) => t.id === confirmOthersId),
+                    activeId: confirmOthersId,
+                  }));
+                } else if (confirmId != null) forceClose(confirmId);
                 setConfirmId(null);
                 setConfirmAll(false);
+                setConfirmOthersId(null);
               }}
             >
               {tr("peek.dirtyConfirm")}

@@ -696,6 +696,7 @@ const zh: Record<string, string> = {
 
   // peek card region (file tree clicks, own tab strip)
   "peek.closeAll": "全部关闭",
+  "peek.closeOthers": "关闭其他",
   "peek.fullscreen": "全屏",
   "peek.restore": "还原",
   "peek.dirtyTitle": "文件尚未保存",
