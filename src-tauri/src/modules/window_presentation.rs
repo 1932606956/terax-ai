@@ -55,6 +55,43 @@ pub fn window_presentation_state(
     *state.0.lock().unwrap_or_else(|error| error.into_inner())
 }
 
+/// Toggles the webview's native context menu (back/refresh/save-as/print).
+/// Terax renders its own menus, so the preview iframe's WebView2 menu is
+/// suppressed while a preview is on screen and restored afterwards.
+/// WebView2-only; a no-op elsewhere (WebKit menus are already handled by
+/// the page's own contextmenu handlers).
+#[tauri::command]
+pub fn webview_set_context_menu(window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+    set_context_menu(&window, enabled)
+}
+
+#[cfg(windows)]
+fn set_context_menu(window: &tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings;
+
+    window
+        .with_webview(move |platform| {
+            let controller = platform.controller();
+            let result = unsafe {
+                controller
+                    .CoreWebView2()
+                    .and_then(|core| core.Settings())
+                    .and_then(|settings: ICoreWebView2Settings| {
+                        settings.SetAreDefaultContextMenusEnabled(enabled)
+                    })
+            };
+            if let Err(error) = result {
+                log::warn!("SetAreDefaultContextMenusEnabled failed: {error}");
+            }
+        })
+        .map_err(|error| format!("with_webview: {error}"))
+}
+
+#[cfg(not(windows))]
+fn set_context_menu(_window: &tauri::WebviewWindow, _enabled: bool) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 pub mod macos {
     use super::{Change, WindowPresentationState};

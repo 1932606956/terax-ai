@@ -11,7 +11,11 @@ import {
 import { t as tr } from "@/i18n/zh";
 import { cn } from "@/lib/utils";
 import { FileIcon } from "@/modules/explorer/FileIcon";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  Maximize02Icon,
+  Minimize02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePeekStore } from "./lib/peekStore";
@@ -45,21 +49,23 @@ export function PeekTabs({ activeSpaceId }: Props) {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [widthPct, setWidthPct] = useState(DEFAULT_WIDTH_PCT);
+  // Expanded over the whole workspace row; drag-resize pauses while maximized.
+  const [maximized, setMaximized] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const draggingRef = useRef(false);
 
   // A peek area left over from a previous space must not linger over the
-  // workspace: following a space switch, close everything from the old space.
   useEffect(() => {
     if (storeActiveSpaceId != null && storeActiveSpaceId !== activeSpaceId) {
       clear();
     }
   }, [storeActiveSpaceId, activeSpaceId, clear]);
 
-  // Right-edge drag handle: fixed-percentage width, window-level tracking. The
-  // percentage is of the workspace row, so the terminal beside the card keeps
-  // the remaining width rather than being overlapped.
+  // Left-edge drag handle: window-level tracking. The percentage is of the
+  // workspace row, so the terminal beside the card keeps the remaining width
+  // rather than being overlapped. The card grows when the pointer moves right
+  // (it is anchored to the row's left edge).
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!draggingRef.current) return;
@@ -73,7 +79,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
       if (!row) return;
       const rect = row.getBoundingClientRect();
       if (rect.width <= 0) return;
-      const pct = ((rect.right - e.clientX) / rect.width) * 100;
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
       setWidthPct(Math.min(MAX_WIDTH_PCT, Math.max(MIN_WIDTH_PCT, pct)));
     };
     const onUp = () => {
@@ -111,7 +117,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
     <div
       ref={containerRef}
       className="relative flex h-full shrink-0 flex-col border-r bg-card"
-      style={{ width: `${widthPct}%` }}
+      style={{ width: maximized ? "100%" : `${widthPct}%` }}
     >
       <div className="flex h-8 shrink-0 items-stretch gap-0.5 border-b px-1">
         <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
@@ -139,9 +145,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
                   name={basename(tab.path)}
                   className="size-3.5 shrink-0 object-contain"
                 />
-                <span className="max-w-40 truncate">
-                  {basename(tab.path)}
-                </span>
+                <span className="max-w-40 truncate">{basename(tab.path)}</span>
                 {tab.dirty && (
                   <span
                     className="size-1.5 shrink-0 rounded-full bg-foreground"
@@ -168,13 +172,30 @@ export function PeekTabs({ activeSpaceId }: Props) {
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={requestCloseAll}
-          className="shrink-0 self-center rounded-sm px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          {tr("peek.closeAll")}
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5 self-center pr-0.5">
+          <button
+            type="button"
+            onClick={requestCloseAll}
+            aria-label={tr("peek.closeAll")}
+            title={tr("peek.closeAll")}
+            className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.9} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMaximized((m) => !m)}
+            aria-label={maximized ? tr("peek.restore") : tr("peek.fullscreen")}
+            title={maximized ? tr("peek.restore") : tr("peek.fullscreen")}
+            className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <HugeiconsIcon
+              icon={maximized ? Minimize02Icon : Maximize02Icon}
+              size={12}
+              strokeWidth={1.9}
+            />
+          </button>
+        </div>
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -188,13 +209,15 @@ export function PeekTabs({ activeSpaceId }: Props) {
         ))}
       </div>
 
-      {/* Right-edge drag handle (4px) */}
-      <div
-        onPointerDown={() => {
-          draggingRef.current = true;
-        }}
-        className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-border"
-      />
+      {/* Left-edge drag handle (4px); hidden while maximized */}
+      {maximized ? null : (
+        <div
+          onPointerDown={() => {
+            draggingRef.current = true;
+          }}
+          className="absolute inset-y-0 left-0 w-1 cursor-col-resize hover:bg-border"
+        />
+      )}
 
       <AlertDialog
         open={confirmId !== null || confirmAll}
