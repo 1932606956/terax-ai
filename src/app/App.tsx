@@ -5,7 +5,11 @@ import {
 } from "@/components/ui/resizable";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { consumeLaunchFiles, getCliLaunchDir, getLaunchDir } from "@/lib/launchDir";
+import {
+  consumeLaunchFiles,
+  getCliLaunchDir,
+  getLaunchDir,
+} from "@/lib/launchDir";
 import { IS_MAC } from "@/lib/platform";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { usePresence } from "@/lib/usePresence";
@@ -76,6 +80,7 @@ import {
 import { StatusBar } from "@/modules/statusbar";
 import {
   type CloseTabsPlan,
+  resolveNewTabCwd,
   TabSwitcherHud,
   useTabSwitcher,
   useTabs,
@@ -343,6 +348,7 @@ export default function App() {
   } = useSidebarPanel(explorerRef);
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
+  const [newEditorRoot, setNewEditorRoot] = useState<string | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [paletteInitialMode, setPaletteInitialMode] = useState<
     "commands" | "content"
@@ -605,28 +611,55 @@ export default function App() {
   });
   const askPresence = usePresence(Boolean(askPopup), 120);
 
-  const openNewTab = useCallback(() => {
-    newTab(inheritedCwdForNewTab());
+  const openNewTab = useCallback(async () => {
+    const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+    if (dir === null) return;
+    newTab(dir);
   }, [newTab, inheritedCwdForNewTab]);
 
-  const openNewPrivateTab = useCallback(() => {
-    newPrivateTab(inheritedCwdForNewTab());
+  const openNewPrivateTab = useCallback(async () => {
+    const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+    if (dir === null) return;
+    newPrivateTab(dir);
   }, [newPrivateTab, inheritedCwdForNewTab]);
 
-  const openNewBlockTab = useCallback(() => {
-    newBlockTab(inheritedCwdForNewTab());
+  const openNewBlockTab = useCallback(async () => {
+    const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+    if (dir === null) return;
+    newBlockTab(dir);
   }, [newBlockTab, inheritedCwdForNewTab]);
 
+  const openNewEditor = useCallback(async () => {
+    const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+    if (dir === null) return;
+    setNewEditorRoot(dir);
+    setNewEditorOpen(true);
+  }, [inheritedCwdForNewTab]);
+
+  const openNewGitGraph = useCallback(async () => {
+    const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+    if (dir === null) return;
+    try {
+      const repo = await native.gitResolveRepo(dir);
+      if (!repo) return;
+      openCommitHistoryTab({ repoRoot: repo.repoRoot, branch: repo.branch });
+    } catch {
+      /* noop */
+    }
+  }, [inheritedCwdForNewTab, openCommitHistoryTab]);
+
   const launchAgentGroup = useCallback(
-    (request: AgentLaunchRequest) => {
+    async (request: AgentLaunchRequest) => {
       const command = validateAgentLaunchCommand(request.command);
       if (!command.ok) return;
+      const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+      if (dir === null) return;
       const title =
         request.instances === 1
           ? request.label
           : `${request.label} × ${request.instances}`;
       const { leafIds: agentLeafIds } = newAgentGroupTab(
-        inheritedCwdForNewTab(),
+        dir,
         title,
         request.instances,
       );
@@ -855,7 +888,9 @@ export default function App() {
     });
 
   const openPreviewTab = useCallback(
-    (url: string) => {
+    async (url: string) => {
+      const dir = await resolveNewTabCwd(inheritedCwdForNewTab());
+      if (dir === null) return;
       const id = newPreviewTab(url);
       // Focus the address bar if the URL is empty so the user can type.
       if (!url) {
@@ -863,7 +898,7 @@ export default function App() {
       }
       return id;
     },
-    [newPreviewTab],
+    [newPreviewTab, inheritedCwdForNewTab],
   );
 
   const splitActivePaneInActiveTab = useCallback(
@@ -931,7 +966,7 @@ export default function App() {
       "tab.newBlock": openNewBlockTab,
       "tab.newPrivate": openNewPrivateTab,
       "tab.newPreview": () => openPreviewTab(""),
-      "tab.newEditor": () => setNewEditorOpen(true),
+      "tab.newEditor": openNewEditor,
       "tab.close": handleCloseTabOrPane,
       "tab.next": () => stepSwitcher(1),
       "tab.prev": () => stepSwitcher(-1),
@@ -1005,6 +1040,7 @@ export default function App() {
       openNewBlockTab,
       openNewPrivateTab,
       openPreviewTab,
+      openNewEditor,
       activeSpaceId,
       selectByIndex,
       splitActivePaneInActiveTab,
@@ -1309,9 +1345,9 @@ export default function App() {
             openNewTab,
             openNewBlock: openNewBlockTab,
             openNewPrivate: openNewPrivateTab,
-            openNewEditor: () => setNewEditorOpen(true),
+            openNewEditor,
             openNewPreview: () => openPreviewTab(""),
-            openGitGraph: openGitGraphFromContext,
+            openGitGraph: openNewGitGraph,
             toggleSourceControl,
             closeActiveTabOrPane: handleCloseTabOrPane,
             splitPaneRight: () => splitActivePaneInActiveTab("row"),
@@ -1341,8 +1377,9 @@ export default function App() {
       openNewTab,
       openNewBlockTab,
       openNewPrivateTab,
+      openNewEditor,
       openPreviewTab,
-      openGitGraphFromContext,
+      openNewGitGraph,
       toggleSourceControl,
       handleCloseTabOrPane,
       splitActivePaneInActiveTab,
@@ -1425,6 +1462,15 @@ export default function App() {
     [isTerminalTab, activeLeafId],
   );
 
+  // Agent-driven previews bypass the folder picker: they are automation, not
+  // a user opening a new tab from the menu.
+  const openPreviewTabForAi = useCallback(
+    (url: string) => {
+      newPreviewTab(url);
+    },
+    [newPreviewTab],
+  );
+
   useAiLiveBridge({
     setLive,
     activeId,
@@ -1432,7 +1478,7 @@ export default function App() {
     explorerRoot,
     launchCwd,
     home,
-    openPreviewTab,
+    openPreviewTab: openPreviewTabForAi,
     newAgentTab,
     terminalRefs,
   });
@@ -1468,8 +1514,8 @@ export default function App() {
               onNewBlock={openNewBlockTab}
               onNewPrivate={openNewPrivateTab}
               onNewPreview={() => openPreviewTab("")}
-              onNewEditor={() => setNewEditorOpen(true)}
-              onNewGitGraph={openGitGraphFromContext}
+              onNewEditor={openNewEditor}
+              onNewGitGraph={openNewGitGraph}
               onLaunchAgents={launchAgentGroup}
               onClose={handleClose}
               onCloseTabsToRight={handleCloseTabsToRight}
@@ -1685,7 +1731,7 @@ export default function App() {
           <NewEditorDialog
             open={newEditorOpen}
             onOpenChange={setNewEditorOpen}
-            rootPath={explorerRoot ?? home}
+            rootPath={newEditorRoot ?? explorerRoot ?? home}
             onCreated={(path) => openFileTab(path)}
           />
 
