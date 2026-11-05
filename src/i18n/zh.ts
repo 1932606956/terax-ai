@@ -463,6 +463,7 @@ const zh: Record<string, string> = {
   "scm.fetching": "获取中...",
   "scm.pulling": "拉取中...",
   "scm.refresh": "刷新源代码管理",
+  "scm.revealRepo": "在文件管理器中打开仓库",
   "scm.nothingStaged": "未暂存任何更改",
   "scm.commit": "提交",
   "scm.committing": "提交中...",

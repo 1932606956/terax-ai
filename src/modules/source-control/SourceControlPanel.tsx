@@ -57,6 +57,7 @@ import {
   CheckmarkCircle01Icon,
   Download01Icon,
   Folder01Icon,
+  FolderOpenIcon,
   FolderCloudIcon,
   FolderGitTwoIcon,
   GitBranchIcon,
@@ -787,6 +788,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   className={cn(refreshAnimating && "animate-spin")}
                 />
               )}
+            </IconActionButton>
+            <IconActionButton
+              label={t("scm.revealRepo")}
+              disabled={!scm.repo?.repoRoot}
+              onClick={() => {
+                const repoRoot = scm.repo?.repoRoot;
+                if (repoRoot) void revealInFinder(repoRoot);
+              }}
+              side="bottom"
+            >
+              <HugeiconsIcon
+                icon={FolderOpenIcon}
+                size={14}
+                strokeWidth={1.9}
+              />
             </IconActionButton>
           </div>
         </header>
