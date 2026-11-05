@@ -5,7 +5,7 @@ import { DEFAULT_SPACE_ID } from "@/modules/tabs/lib/useTabs";
 import { isLeaf, type PaneNode } from "@/modules/terminal/lib/panes";
 import { parseWorkspaceScopeKey, type WorkspaceEnv } from "@/modules/workspace";
 import { useEffect, useRef } from "react";
-import { activeSpaceEnv, freshTabCwd } from "./activeSpace";
+import { activeSpaceEnv, freshTabCwd, launchCwdForRestore } from "./activeSpace";
 import { freshTerminalTab, hydrateTabs } from "./serialize";
 import { loadAll, type SpaceMeta, saveActiveId, saveSpacesList } from "./store";
 import { useSpaces } from "./useSpaces";
@@ -13,6 +13,8 @@ import { useSpaces } from "./useSpaces";
 type Params = {
   ready: boolean;
   launchCwd: string | null;
+  /** CLI-passed dir only (Explorer "Open in Terax", `terax <dir>`); null on normal launches. */
+  cliLaunchCwd: string | null;
   home: string | null;
   allocId: () => number;
   replaceTabs: (tabs: Tab[], activeId: number) => void;
@@ -37,6 +39,7 @@ function uniqueCwds(tabs: Tab[]): string[] {
 export function useSpacesBoot({
   ready,
   launchCwd,
+  cliLaunchCwd,
   home,
   allocId,
   replaceTabs,
@@ -93,14 +96,24 @@ export function useSpacesBoot({
 
         // Apply the space's env+home before the fresh-tab fallback and spawns
         // below; env is set synchronously so cwd resolution picks WSL vs local.
-        const env = activeSpaceEnv(spaces, active);
         const restoredHome = await adoptWorkspaceEnv(env);
 
         // Active space must never be empty, else its tab list shows nothing.
-        if (!restored.some((t) => t.spaceId === active)) {
+        const needsFresh = !restored.some((t) => t.spaceId === active);
+        if (needsFresh) {
           const cwd = freshTabCwd(env, restoredHome, launchCwd, home);
           restored.push(freshTerminalTab(active, cwd, allocId));
         }
+
+        // Explicit CLI dir: user aimed this process at a folder, so open it
+        // as a tab and activate it even when the session restored fine.
+        // freshTabCwd above does not cover it: under restored sessions
+        // launchCwd loses to restoredHome by design.
+        const launchTabCwd = launchCwdForRestore(env, cliLaunchCwd, !needsFresh);
+        const launchTab = launchTabCwd
+          ? freshTerminalTab(active, launchTabCwd, allocId)
+          : null;
+        if (launchTab) restored.push(launchTab);
 
         await Promise.allSettled(
           uniqueCwds(restored).map((cwd) => native.workspaceAuthorize(cwd)),
@@ -111,9 +124,12 @@ export function useSpacesBoot({
           initialActiveIndex[id] = st.activeTabIndex;
         useSpaces.getState().hydrate(spaces, active, initialActiveIndex);
 
+        // An explicit CLI dir wins over the restored index: the user aimed
+        // this process at a folder. Keeping state on disk unchanged preserves
+        // the restore order for the next plain launch.
         const inActive = restored.filter((t) => t.spaceId === active);
         const idx = states.get(active)?.activeTabIndex ?? 0;
-        const activeTab = inActive[idx] ?? inActive[0] ?? restored[0];
+        const activeTab = launchTab ?? inActive[idx] ?? inActive[0] ?? restored[0];
         replaceTabs(restored, activeTab.id);
       } catch (e) {
         console.error("[terax] spaces boot failed:", e);
@@ -124,6 +140,7 @@ export function useSpacesBoot({
   }, [
     ready,
     launchCwd,
+    cliLaunchCwd,
     home,
     allocId,
     replaceTabs,

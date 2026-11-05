@@ -5,7 +5,7 @@ import {
 } from "@/components/ui/resizable";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { consumeLaunchFiles, getLaunchDir } from "@/lib/launchDir";
+import { consumeLaunchFiles, getCliLaunchDir, getLaunchDir } from "@/lib/launchDir";
 import { IS_MAC } from "@/lib/platform";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { usePresence } from "@/lib/usePresence";
@@ -278,6 +278,7 @@ export default function App() {
   useSpacesBoot({
     ready: launchCwdResolved,
     launchCwd,
+    cliLaunchCwd: getCliLaunchDir() ?? null,
     home,
     allocId,
     replaceTabs,
