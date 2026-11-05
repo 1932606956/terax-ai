@@ -26,7 +26,21 @@ export function segmentsFromCwd(cwd: string, home: string | null): Segment[] {
   let tail: string;
 
   if (usingHome) {
+    // Home sits inside a real drive, so the picker keeps the This PC root in
+    // front of it: without that, a cwd anywhere under home had no drive picker
+    // at all, and drive switching was only reachable from paths outside home.
+    const homeDrive = WINDOWS_DRIVE.exec(normHome ?? "");
     segments = [
+      ...(homeDrive
+        ? [
+            {
+              label: "",
+              fullPath: COMPUTER_ROOT_PATH,
+              isHome: false,
+              isComputerRoot: true,
+            },
+          ]
+        : []),
       { label: "~", fullPath: normHome!, isHome: true, isComputerRoot: false },
     ];
     tail = normCwd.slice(normHome!.length).replace(/^\//, "");

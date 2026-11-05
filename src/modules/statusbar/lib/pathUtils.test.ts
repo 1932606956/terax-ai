@@ -141,4 +141,21 @@ describe("segmentsFromCwd", () => {
       segmentsFromCwd("/Users/me/x", "/Users/me").some((s) => s.isComputerRoot),
     ).toBe(false);
   });
+
+  it("keeps the computer root above ~ for a Windows home", () => {
+    // Home lives on a real drive, so the picker must still reach This PC from
+    // any cwd under it; otherwise drive switching is unreachable there.
+    for (const cwd of ["C:/Users/me", "C:/Users/me/proj"]) {
+      const segments = segmentsFromCwd(cwd, "C:/Users/me");
+      expect(segments[0]).toEqual(COMPUTER_ROOT);
+      expect(segments[1].isHome).toBe(true);
+      expect(segments[1].fullPath).toBe("C:/Users/me");
+    }
+  });
+
+  it("has exactly one computer root when home and cwd share a drive", () => {
+    const segments = segmentsFromCwd("D:/work/x", "C:/Users/me");
+    expect(segments.filter((s) => s.isComputerRoot)).toHaveLength(1);
+    expect(segments[0].isComputerRoot).toBe(true);
+  });
 });
