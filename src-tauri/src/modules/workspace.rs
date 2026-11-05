@@ -784,6 +784,32 @@ mod auth_tests {
         fs::canonicalize(&p).expect("canonicalize tempdir")
     }
 
+    // Directory symlinks need SeCreateSymbolicLinkPrivilege, which a normal
+    // user only gets with Developer Mode on. A junction is a real reparse
+    // point that canonicalize resolves the same way, so the escape check is
+    // exercised either way.
+    #[cfg(windows)]
+    fn windows_dir_link(target: &std::path::Path, link: &std::path::Path) {
+        match std::os::windows::fs::symlink_dir(target, link) {
+            Ok(()) => {}
+            Err(_) => {
+                let status = std::process::Command::new("cmd")
+                    .args(["/C", "mklink", "/J"])
+                    .arg(link)
+                    .arg(target)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .expect("run mklink");
+                assert!(status.success(), "neither symlink nor junction created");
+            }
+        }
+        assert!(
+            fs::canonicalize(link).expect("canonicalize link") == *target,
+            "link must resolve to the escape target"
+        );
+    }
+
     #[test]
     fn authorize_spawn_cwd_accepts_none() {
         let reg = WorkspaceRegistry::default();
@@ -926,7 +952,7 @@ mod auth_tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&outside, &link).expect("symlink");
         #[cfg(windows)]
-        std::os::windows::fs::symlink_dir(&outside, &link).expect("symlink");
+        windows_dir_link(&outside, &link);
         let reg = WorkspaceRegistry::default();
         reg.authorize(&allowed).expect("authorize root");
         let s = link.to_string_lossy().into_owned();
