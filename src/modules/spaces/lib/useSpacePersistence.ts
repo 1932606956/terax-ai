@@ -1,6 +1,6 @@
 import type { Tab } from "@/modules/tabs";
 import { useCallback, useEffect, useRef } from "react";
-import { isSerializableTab, serializeTabs } from "./serialize";
+import { persistedSpaceState } from "./serialize";
 import { saveState } from "./store";
 import { useSpaces } from "./useSpaces";
 
@@ -48,16 +48,15 @@ export function useSpacePersistence({
     }
 
     for (const [spaceId, group] of groups) {
-      const serialized = serializeTabs(group);
+      // Save path persists locked tabs only; unlocked tabs leave no trace.
       const prev = last.current.get(spaceId);
-      let activeTabIndex = prev?.activeTabIndex ?? 0;
-      if (spaceId === snap.activeSpaceId) {
-        const idx = group
-          .filter(isSerializableTab)
-          .findIndex((t) => t.id === snap.activeId);
-        if (idx >= 0) activeTabIndex = idx;
-      }
-      const json = JSON.stringify(serialized);
+      const isActive = spaceId === snap.activeSpaceId;
+      const { tabs, activeTabIndex } = persistedSpaceState(
+        group,
+        isActive ? snap.activeId : null,
+        prev?.activeTabIndex ?? 0,
+      );
+      const json = JSON.stringify(tabs);
       if (
         prev &&
         prev.json === json &&
@@ -66,7 +65,7 @@ export function useSpacePersistence({
         continue;
       }
       last.current.set(spaceId, { json, activeTabIndex });
-      void saveState(spaceId, { tabs: serialized, activeTabIndex });
+      void saveState(spaceId, { tabs, activeTabIndex });
     }
   }, []);
 

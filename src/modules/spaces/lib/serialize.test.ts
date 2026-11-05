@@ -1,7 +1,14 @@
 import type { Tab } from "@/modules/tabs/lib/useTabs";
 import type { PaneNode } from "@/modules/terminal/lib/panes";
 import { describe, expect, it } from "vitest";
-import { hydrateTabs, type SerializedTab, serializeTabs } from "./serialize";
+import {
+  hydrateTabs,
+  isPersistedTab,
+  persistedActiveIndex,
+  persistedSpaceState,
+  type SerializedTab,
+  serializeTabs,
+} from "./serialize";
 
 function counter(start = 100): () => number {
   let n = start;
@@ -25,10 +32,12 @@ function term(over: Partial<Extract<Tab, { kind: "terminal" }>>): Tab {
 }
 
 describe("serializeTabs", () => {
-  it("drops private terminals and transient kinds", () => {
+  it("persists only locked terminals and drops everything unlocked", () => {
     const tabs: Tab[] = [
-      term({ id: 1 }),
-      term({ id: 3, private: true }),
+      term({ id: 1, locked: true }),
+      term({ id: 2 }),
+      term({ id: 3, locked: true, private: true }),
+      term({ id: 4, private: true }),
       {
         id: 5,
         kind: "git-diff",
@@ -51,7 +60,19 @@ describe("serializeTabs", () => {
       },
     ];
     const out = serializeTabs(tabs);
-    expect(out.map((t) => t.kind)).toEqual(["terminal", "editor"]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ kind: "terminal", locked: true });
+  });
+
+  it("keeps locked flags on every surviving terminal", () => {
+    const out = serializeTabs([
+      term({ id: 1, locked: true }),
+      term({ id: 2, locked: true, blocks: true }),
+    ]);
+    expect(out.map((t) => t.kind)).toEqual(["terminal", "terminal"]);
+    for (const t of out) {
+      expect(t).toMatchObject({ kind: "terminal", locked: true });
+    }
   });
 
   it("marks the active leaf in a split tree", () => {
@@ -64,13 +85,87 @@ describe("serializeTabs", () => {
         { kind: "leaf", id: 12, cwd: "/b" },
       ],
     };
-    const [s] = serializeTabs([term({ paneTree: tree, activeLeafId: 12 })]);
+    const [s] = serializeTabs([
+      term({ paneTree: tree, activeLeafId: 12, locked: true }),
+    ]);
+    expect(s).toBeDefined();
     const node = s as Extract<SerializedTab, { kind: "terminal" }>;
     expect(node.tree.kind).toBe("split");
     if (node.tree.kind === "split") {
       expect(node.tree.children[1]).toMatchObject({ cwd: "/b", active: true });
       expect(node.tree.children[0]).not.toHaveProperty("active");
     }
+  });
+});
+
+describe("isPersistedTab", () => {
+  it("accepts only non-private locked terminals", () => {
+    expect(isPersistedTab(term({ locked: true }))).toBe(true);
+    expect(isPersistedTab(term({}))).toBe(false);
+    expect(isPersistedTab(term({ locked: true, private: true }))).toBe(false);
+    expect(
+      isPersistedTab({
+        id: 9,
+        kind: "editor",
+        spaceId: "s1",
+        title: "x",
+        path: "/a/x.ts",
+        dirty: false,
+        preview: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("persistedActiveIndex", () => {
+  it("resolves the active tab within the locked-only order", () => {
+    const tabs = [
+      term({ id: 1 }),
+      term({ id: 2, locked: true }),
+      term({ id: 3 }),
+      term({ id: 4, locked: true }),
+    ];
+    expect(persistedActiveIndex(tabs, 4)).toBe(1);
+    expect(persistedActiveIndex(tabs, 3)).toBe(-1);
+  });
+});
+
+describe("persistedSpaceState", () => {
+  it("drops unlocked tabs and remaps the active index to a survivor", () => {
+    const tabs = [
+      term({ id: 1 }),
+      term({ id: 2, locked: true }),
+      term({ id: 3 }),
+      term({ id: 4, locked: true }),
+    ];
+    const state = persistedSpaceState(tabs, 3, 0);
+    expect(state.tabs).toHaveLength(2);
+    for (const t of state.tabs) {
+      expect(t.kind).toBe("terminal");
+      if (t.kind === "terminal") expect(t.locked).toBe(true);
+    }
+  });
+
+  it("keeps the locked active tab selected after filtering", () => {
+    const tabs = [
+      term({ id: 1 }),
+      term({ id: 2, locked: true }),
+      term({ id: 3, locked: true }),
+    ];
+    expect(persistedSpaceState(tabs, 3, 0).activeTabIndex).toBe(1);
+  });
+
+  it("clamps a stale stored index and saves empty spaces at index zero", () => {
+    const tabs = [term({ id: 1, locked: true }), term({ id: 2 })];
+    expect(persistedSpaceState(tabs, null, 7).activeTabIndex).toBe(0);
+    const empty = persistedSpaceState([term({ id: 1 })], 1, 0);
+    expect(empty.tabs).toEqual([]);
+    expect(empty.activeTabIndex).toBe(0);
+  });
+
+  it("restores an empty locked space from the fresh-tab fallback", () => {
+    const empty = persistedSpaceState([term({ id: 1 })], 1, 0);
+    expect(hydrateTabs(empty.tabs, "s1", counter())).toEqual([]);
   });
 });
 
@@ -90,6 +185,7 @@ describe("hydrateTabs", () => {
         paneTree: tree,
         activeLeafId: 12,
         blocks: true,
+        locked: true,
         customTitle: "x",
         customColor: "blue",
       }),
@@ -124,8 +220,8 @@ describe("hydrateTabs", () => {
       ],
     };
     const serialized = serializeTabs([
-      term({ id: 1, paneTree: tree, activeLeafId: 11 }),
-      term({ id: 2 }),
+      term({ id: 1, paneTree: tree, activeLeafId: 11, locked: true }),
+      term({ id: 2, locked: true }),
     ]);
     const restored = hydrateTabs(serialized, "s1", counter(100));
 
