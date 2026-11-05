@@ -1548,30 +1548,32 @@ export default function App() {
               <ResizablePanel id="workspace" defaultSize="78%" minSize="30%">
                 <div className="h-full min-h-0 pl-0.5 pr-2">
                   <div className="terax-pane flex h-full min-h-0 flex-col">
-                    <div className="relative min-h-0 flex-1">
-                      <WorkspaceSurface
-                        tabs={tabs}
-                        activeId={activeId}
-                        activeTab={activeTab}
-                        registerTerminalHandle={registerTerminalHandle}
-                        onSearchReady={handleSearchReady}
-                        onCwd={handleTerminalCwd}
-                        onExit={handleLeafExit}
-                        onFocusLeaf={handleFocusLeaf}
-                        registerEditorHandle={registerEditorHandle}
-                        onEditorDirtyChange={handleEditorDirty}
-                        onEditorCloseTab={disposeTab}
-                        registerPreviewHandle={registerPreviewHandle}
-                        onPreviewUrlChange={handlePreviewUrl}
-                        onAiDiffAccept={(id) => respondToApproval(id, true)}
-                        onAiDiffReject={(id) => respondToApproval(id, false)}
-                        onOpenCommitFile={openCommitFileDiffTab}
-                        onGitHistorySearchHandle={setGitHistoryHandle}
-                        onSetMarkdownView={setMarkdownView}
-                      />
+                    <div className="flex min-h-0 flex-1">
                       <Suspense fallback={null}>
                         <PeekTabs activeSpaceId={activeSpaceId} />
                       </Suspense>
+                      <div className="relative min-h-0 min-w-0 flex-1">
+                        <WorkspaceSurface
+                          tabs={tabs}
+                          activeId={activeId}
+                          activeTab={activeTab}
+                          registerTerminalHandle={registerTerminalHandle}
+                          onSearchReady={handleSearchReady}
+                          onCwd={handleTerminalCwd}
+                          onExit={handleLeafExit}
+                          onFocusLeaf={handleFocusLeaf}
+                          registerEditorHandle={registerEditorHandle}
+                          onEditorDirtyChange={handleEditorDirty}
+                          onEditorCloseTab={disposeTab}
+                          registerPreviewHandle={registerPreviewHandle}
+                          onPreviewUrlChange={handlePreviewUrl}
+                          onAiDiffAccept={(id) => respondToApproval(id, true)}
+                          onAiDiffReject={(id) => respondToApproval(id, false)}
+                          onOpenCommitFile={openCommitFileDiffTab}
+                          onGitHistorySearchHandle={setGitHistoryHandle}
+                          onSetMarkdownView={setMarkdownView}
+                        />
+                      </div>
                     </div>
 
                     <WorkspaceInputBar

@@ -109,6 +109,34 @@ describe("WebGPU surface data path", () => {
     );
   });
 
+  it("moves the hidden input to the cursor so IME candidates follow it", async () => {
+    const h = await harness();
+    const input = h.surface.inputElement();
+    h.cursor.x = 0;
+    h.cursor.y = 0;
+    h.render();
+    const atOrigin = input.style.transform;
+    h.cursor.x = 12;
+    h.cursor.y = 7;
+    h.render();
+    expect(input.style.transform).not.toBe(atOrigin);
+    // Cell-sized steps: the anchor tracks the grid, not the pane origin.
+    expect(input.style.transform).toMatch(/^translate\(\d+px, \d+px\)$/);
+    expect(input.style.transform).not.toBe("translate(0px, 0px)");
+  });
+
+  it("parks the hidden input at the pane origin when the cursor is hidden", async () => {
+    const h = await harness();
+    const input = h.surface.inputElement();
+    h.cursor.x = 12;
+    h.cursor.y = 7;
+    h.render();
+    expect(input.style.transform).not.toBe("translate(0px, 0px)");
+    h.cursor.visible = false;
+    h.render();
+    expect(input.style.transform).toBe("translate(0px, 0px)");
+  });
+
   it("redraws whenever the frame reports damage even if no record changed", async () => {
     const h = await harness();
     h.render();

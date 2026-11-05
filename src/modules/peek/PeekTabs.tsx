@@ -57,7 +57,9 @@ export function PeekTabs({ activeSpaceId }: Props) {
     }
   }, [storeActiveSpaceId, activeSpaceId, clear]);
 
-  // Right-edge drag handle: fixed-percentage width, window-level tracking.
+  // Right-edge drag handle: fixed-percentage width, window-level tracking. The
+  // percentage is of the workspace row, so the terminal beside the card keeps
+  // the remaining width rather than being overlapped.
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!draggingRef.current) return;
@@ -67,8 +69,10 @@ export function PeekTabs({ activeSpaceId }: Props) {
         draggingRef.current = false;
         return;
       }
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const row = containerRef.current?.parentElement;
+      if (!row) return;
+      const rect = row.getBoundingClientRect();
+      if (rect.width <= 0) return;
       const pct = ((rect.right - e.clientX) / rect.width) * 100;
       setWidthPct(Math.min(MAX_WIDTH_PCT, Math.max(MIN_WIDTH_PCT, pct)));
     };
@@ -106,7 +110,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-y-0 left-0 z-30 flex flex-col border-r bg-card shadow-lg"
+      className="relative flex h-full shrink-0 flex-col border-r bg-card"
       style={{ width: `${widthPct}%` }}
     >
       <div className="flex h-8 shrink-0 items-stretch gap-0.5 border-b px-1">
@@ -131,7 +135,10 @@ export function PeekTabs({ activeSpaceId }: Props) {
                 )}
                 title={tab.path}
               >
-                <FileIcon name={basename(tab.path)} />
+                <FileIcon
+                  name={basename(tab.path)}
+                  className="size-3.5 shrink-0 object-contain"
+                />
                 <span className="max-w-40 truncate">
                   {basename(tab.path)}
                 </span>
