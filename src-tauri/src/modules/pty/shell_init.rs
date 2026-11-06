@@ -152,6 +152,10 @@ fn apply_common(
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERAX_TERMINAL", "1");
+    // dsh-tui enables ConPTY DECSET 9001 (win32-input-mode) on Windows.
+    // Terax does not implement that mode yet, so keep classic VT arrow keys.
+    #[cfg(windows)]
+    cmd.env("DSH_TUI_DISABLE_WIN32_INPUT_MODE", "1");
     if blocks {
         cmd.env("TERAX_BLOCKS", "1");
     }
@@ -1150,6 +1154,17 @@ mod tests {
                 .get_env("PATH")
                 .and_then(|path| std::env::split_paths(path).next()),
             Some(std::path::PathBuf::from("/app/bin"))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_disables_dsh_tui_win32_input_mode() {
+        let mut command = CommandBuilder::new("shell");
+        apply_common(&mut command, None, false, None);
+        assert_eq!(
+            command.get_env("DSH_TUI_DISABLE_WIN32_INPUT_MODE"),
+            Some(OsStr::new("1"))
         );
     }
 }
