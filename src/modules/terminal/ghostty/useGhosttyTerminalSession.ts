@@ -26,6 +26,7 @@ import {
   measureTerminalFont,
   readTerminalGpuTheme,
   rgbToInt,
+  terminalFontPixelSize,
   type TerminalFontSpec,
 } from "./gpu/terminalVisuals";
 import { getWebGpuTerminalRuntime } from "./gpu/WebGpuTerminalRuntime";
@@ -133,16 +134,15 @@ export function useGhosttyTerminalSession({
   const letterSpacing = usePreferencesStore(
     (state) => state.terminalLetterSpacing,
   );
-  const zoomLevel = usePreferencesStore((state) => state.zoomLevel);
   const font = useMemo<TerminalFontSpec>(
     () => ({
       family: resolveFontFamily(fontFamily),
-      size: Math.max(4, Math.round(fontSize * zoomLevel)),
+      size: terminalFontPixelSize(fontSize),
       lineHeight: 1.2,
       letterSpacing,
       weight: fontWeight,
     }),
-    [fontFamily, fontSize, fontWeight, letterSpacing, zoomLevel],
+    [fontFamily, fontSize, fontWeight, letterSpacing],
   );
   const fontRef = useRef(font);
   fontRef.current = font;

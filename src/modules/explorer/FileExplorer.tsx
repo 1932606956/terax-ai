@@ -8,7 +8,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { t } from "@/i18n/zh";
-import { IS_MAC } from "@/lib/platform";
+import { IS_MAC, IS_WINDOWS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import type { GitStatusSnapshot } from "@/modules/ai/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -46,6 +46,7 @@ import {
 } from "./lib/clipboardPaste";
 import {
   copyToClipboard,
+  openInWindowsTerminal,
   openWithExternal,
   relativePath,
   revealInFinder,
@@ -934,6 +935,14 @@ export const FileExplorer = memo(
                       {t("ctx.openInTerminal")}
                     </ContextMenuItem>
                   )}
+                  {menuTarget.isDir && IS_WINDOWS && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => void openInWindowsTerminal(menuTarget.path)}
+                    >
+                      {t("ctx.openInWindowsTerminal")}
+                    </ContextMenuItem>
+                  )}
                   {menuTarget.isDir && onOpenInSourceControl && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
@@ -1046,6 +1055,14 @@ export const FileExplorer = memo(
                       onSelect={() => onRevealInTerminal(rootPath)}
                     >
                       {t("ctx.openInTerminal")}
+                    </ContextMenuItem>
+                  )}
+                  {IS_WINDOWS && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => void openInWindowsTerminal(rootPath)}
+                    >
+                      {t("ctx.openInWindowsTerminal")}
                     </ContextMenuItem>
                   )}
                   {onOpenInSourceControl && (

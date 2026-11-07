@@ -161,6 +161,7 @@ export type Preferences = {
   terminalLetterSpacing: number;
   terminalFontSize: number;
   terminalScrollback: number;
+  /** Built-in shell path, `wt:{guid}`, or `""` for Auto. */
   terminalShell: string;
   confirmCloseRunningTerminal: boolean;
   lastWslDistro: string | null;

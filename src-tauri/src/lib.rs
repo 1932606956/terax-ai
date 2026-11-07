@@ -365,6 +365,7 @@ pub fn run() {
             shell::shell_bg_logs,
             shell::shell_bg_kill,
             shell::shell_bg_list,
+            shell::shell_open_windows_terminal,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,
             workspace::ipc::wsl_home,

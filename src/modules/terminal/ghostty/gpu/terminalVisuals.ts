@@ -9,6 +9,12 @@ export type TerminalFontSpec = {
   readonly weight: string;
 };
 
+/** CSS pixels for the terminal. UI zoom is not an input: the host is `zoom-exempt`. */
+export function terminalFontPixelSize(fontSize: number): number {
+  return Math.max(4, Math.round(fontSize));
+}
+
+
 /**
  * Cell geometry for one font at one device pixel ratio. The device fields are
  * the authoritative integer sizes every renderer draws with; the CSS fields are

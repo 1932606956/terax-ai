@@ -236,6 +236,7 @@ const zh: Record<string, string> = {
   "gen.shellWsl":
     "集成终端使用的 Shell。WSL 空间使用发行版登录 Shell。已有标签页保持原 Shell。",
   "gen.shellDesc": "新终端标签页使用的 Shell。已有标签页保持原 Shell。",
+  "gen.shellWindowsTerminal": "Windows Terminal 配置",
   "gen.workspace": "工作区环境",
   "gen.workspaceDesc":
     "新空间（终端与 AI 助手均适用）的运行位置：Windows 或 WSL 发行版。已有空间保持不变，可随时从状态栏切换。",
@@ -243,7 +244,7 @@ const zh: Record<string, string> = {
   "gen.letterSpacingDesc":
     "字符间的额外水平间距（像素）。使用 Nerd Font 时可用负值收紧间距。",
   "gen.fontSize": "字号",
-  "gen.fontSizeDesc": "终端文字大小。",
+  "gen.fontSizeDesc": "终端文字大小，不受界面缩放影响。",
   "gen.scrollback": "回滚行数",
   "gen.scrollbackDesc":
     "每个终端保留的历史行数。越大占用内存越多（约 3 KB / 行）。",
@@ -430,6 +431,8 @@ const zh: Record<string, string> = {
   // explorer / shared context menu
   "ctx.open": "打开",
   "ctx.openInTerminal": "在终端中打开",
+  "ctx.openInWindowsTerminal": "在 Windows Terminal 中打开",
+  "toast.windowsTerminalUnavailable": "无法打开 Windows Terminal",
   "ctx.openInScm": "在源代码管理中打开",
   "ctx.openGitHistory": "打开 Git 历史",
   "ctx.reveal": "在文件管理器中显示",

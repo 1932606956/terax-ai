@@ -76,15 +76,28 @@ fn sanitize_shell_override(shell: Option<String>) -> Option<String> {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())?;
     let target = std::fs::canonicalize(&candidate).ok();
-    let allowed = list_shells().into_iter().any(|s| {
-        s.path == candidate || (target.is_some() && std::fs::canonicalize(&s.path).ok() == target)
-    });
+    let shells = list_shells();
+    let allowed = shell_override_allowed(&candidate, target.as_deref(), &shells);
     if allowed {
         Some(candidate)
     } else {
         log::warn!("ignoring non-enumerated shell override '{candidate}'");
         None
     }
+}
+
+fn shell_override_allowed(
+    candidate: &str,
+    canonical_candidate: Option<&std::path::Path>,
+    shells: &[ShellInfo],
+) -> bool {
+    shells.iter().any(|shell| {
+        shell.id == candidate
+            || shell.path == candidate
+            || canonical_candidate.is_some_and(|target| {
+                std::fs::canonicalize(&shell.path).is_ok_and(|path| path.as_path() == target)
+            })
+    })
 }
 
 pub fn detect_shell_name() -> String {
@@ -103,13 +116,29 @@ pub fn detect_shell_name() -> String {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone, Debug)]
 pub struct ShellInfo {
+    /// Preference value. Built-in shells use the executable path so existing
+    /// `terminalShell` settings keep matching. Windows Terminal profiles use
+    /// `wt:{guid}`.
+    pub id: String,
     pub name: String,
     pub path: String,
     /// True when Terax injects OSC 7/133 integration for this shell (cwd
     /// tracking, command blocks, agent detection). Others spawn bare.
     pub integrated: bool,
+}
+
+impl ShellInfo {
+    fn builtin(name: impl Into<String>, path: impl Into<String>, integrated: bool) -> Self {
+        let path = path.into();
+        Self {
+            id: path.clone(),
+            name: name.into(),
+            path,
+            integrated,
+        }
+    }
 }
 
 pub fn list_shells() -> Vec<ShellInfo> {
@@ -303,11 +332,7 @@ mod unix {
             }
             let integrated = !matches!(Shell::classify(&path), Shell::Other);
             let name = path.rsplit('/').next().unwrap_or(&path).to_string();
-            out.push(super::ShellInfo {
-                name,
-                path,
-                integrated,
-            });
+            out.push(super::ShellInfo::builtin(name, path, integrated));
         }
         out
     }
@@ -550,6 +575,21 @@ mod windows {
         if let WorkspaceEnv::Wsl { distro } = workspace {
             let _ = (blocks, shell, control);
             return build_wsl(cwd, distro);
+        }
+        if let Some(launch) = shell.as_deref().and_then(wt_profiles::resolve_launch) {
+            let mut cmd = CommandBuilder::new(&launch.program);
+            // Bare: a Windows Terminal commandline already carries its own
+            // flags, and Terax's profile/-rcfile injection would collide.
+            super::apply_common(&mut cmd, cwd, false, control.as_ref());
+            for arg in &launch.args {
+                cmd.arg(arg);
+            }
+            log::info!(
+                "spawning Windows Terminal profile '{}' via {}",
+                launch.name,
+                launch.program.display()
+            );
+            return Ok(cmd);
         }
         let shell_path = shell
             .map(|s| s.trim().to_string())
@@ -824,11 +864,11 @@ mod windows {
     pub fn list_shells() -> Vec<super::ShellInfo> {
         fn add(out: &mut Vec<super::ShellInfo>, name: &str, path: PathBuf, integrated: bool) {
             if path.is_file() {
-                out.push(super::ShellInfo {
-                    name: name.to_string(),
-                    path: path.to_string_lossy().into_owned(),
+                out.push(super::ShellInfo::builtin(
+                    name,
+                    path.to_string_lossy().into_owned(),
                     integrated,
-                });
+                ));
             }
         }
 
@@ -860,6 +900,8 @@ mod windows {
         if let Some(p) = git_bash_path() {
             add(&mut out, "Git Bash", p, true);
         }
+        let builtins: Vec<PathBuf> = out.iter().map(|shell| PathBuf::from(&shell.path)).collect();
+        out.extend(wt_profiles::list_profiles(&builtins));
         out
     }
 
@@ -1058,6 +1100,629 @@ mod windows {
                 ]
             );
         }
+
+        #[cfg(windows)]
+        #[test]
+        fn imports_safe_windows_terminal_profiles_and_skips_the_rest() {
+            fn json_path(path: String) -> String {
+                serde_json::to_string(&path).unwrap()
+            }
+            let cmd = json_path(
+                std::env::var("SystemRoot")
+                    .map(|root| format!(r"{root}\System32\cmd.exe"))
+                    .unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".to_string()),
+            );
+            let powershell = json_path(
+                std::env::var("SystemRoot")
+                    .map(|root| format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe"))
+                    .unwrap_or_else(|_| {
+                        r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe".to_string()
+                    }),
+            );
+            let wsl_bad = json_path(format!(
+                "{} --distribution ..\\evil",
+                std::env::var("SystemRoot")
+                    .map(|root| format!(r"{root}\System32\wsl.exe"))
+                    .unwrap_or_else(|_| r"C:\Windows\System32\wsl.exe".to_string())
+            ));
+            let wsl_ok = json_path(format!(
+                "{} -d Ubuntu-22.04",
+                std::env::var("SystemRoot")
+                    .map(|root| format!(r"{root}\System32\wsl.exe"))
+                    .unwrap_or_else(|_| r"C:\Windows\System32\wsl.exe".to_string())
+            ));
+            let settings = r#"{
+                    "profiles": { "list": [
+                        { "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}", "name": "Windows PowerShell",
+                           "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo" },
+                        { "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}", "name": "Command Prompt",
+                           "commandline": "%SystemRoot%\\System32\\cmd.exe" },
+                        { "guid": "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}", "name": "Dangerous cmd",
+                           "commandline": __CMD_C__ },
+                        { "guid": "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}", "name": "Encoded",
+                           "commandline": __POWERSHELL_ENC__ },
+                        { "guid": "{cccccccc-cccc-cccc-cccc-cccccccccccc}", "name": "Unknown",
+                           "commandline": "C:\\no\\such\\thing.exe" },
+                        { "guid": "{dddddddd-dddd-dddd-dddd-dddddddddddd}", "name": "Azure",
+                           "source": "Windows.Terminal.Azure", "hidden": false },
+                        { "guid": "{eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee}", "name": "Hidden cmd",
+                           "hidden": true, "commandline": __CMD__ },
+                        { "guid": "{ffffffff-ffff-ffff-ffff-ffffffffffff}", "name": "Git Bash",
+                           "source": "Git" }
+                    ] }
+                }"#
+            .replace(
+                "__CMD_C__",
+                &json_path(format!(
+                    "{} /c calc.exe",
+                    std::env::var("SystemRoot")
+                        .map(|root| format!(r"{root}\System32\cmd.exe"))
+                        .unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".to_string())
+                )),
+            )
+            .replace(
+                "__POWERSHELL_ENC__",
+                &json_path(format!(
+                    "{} -EncodedCommand QQ==",
+                    std::env::var("SystemRoot")
+                        .map(|root| {
+                            format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe")
+                        })
+                        .unwrap_or_else(|_| {
+                            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe".to_string()
+                        })
+                )),
+            )
+            .replace("__CMD__", &cmd)
+            .replace("__POWERSHELL__", &powershell);
+            let git = r#"{ "profiles": [ { "guid": "{ffffffff-ffff-ffff-ffff-ffffffffffff}", "name": "Git Bash", "commandline": __CMD__ } ] }"#
+                .replace("__CMD__", &cmd);
+            let wsl_fragment = r#"{ "profiles": [ { "updates": "{dddddddd-dddd-dddd-dddd-dddddddddddd}", "hidden": true }, { "guid": "{12121212-1212-1212-1212-121212121212}", "name": "Ubuntu", "commandline": __WSL_OK__ }, { "guid": "{34343434-3434-3434-3434-343434343434}", "name": "Bad distro", "commandline": __WSL_BAD__ } ] }"#
+                .replace("__WSL_OK__", &wsl_ok)
+                .replace("__WSL_BAD__", &wsl_bad);
+            let (shells, skipped) =
+                wt_profiles::profiles_from(&settings, &[&git, &wsl_fragment], &[]);
+            let ids: Vec<&str> = shells.iter().map(|shell| shell.id.as_str()).collect();
+            assert_eq!(
+                ids,
+                vec![
+                    "wt:0caa0dad-35be-5f56-a8ff-afceeeaa6101",
+                    "wt:12121212-1212-1212-1212-121212121212",
+                    "wt:61c54bbd-c2c6-5271-96e7-009a87ff44bf",
+                    "wt:ffffffff-ffff-ffff-ffff-ffffffffffff",
+                ],
+                "skipped={skipped:?}"
+            );
+            assert!(shells.iter().all(|shell| !shell.integrated));
+            let powershell = wt_profiles::launch_from(
+                &settings,
+                &[&git, &wsl_fragment],
+                "wt:{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+            )
+            .expect("powershell profile");
+            assert_eq!(powershell.args, vec!["-NoLogo".to_string()]);
+            assert!(powershell
+                .program
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("powershell.exe")));
+            assert!(wt_profiles::launch_from(
+                &settings,
+                &[],
+                "wt:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+            )
+            .is_none());
+            assert!(wt_profiles::launch_from(&settings, &[], "wt:missing").is_none());
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn skips_windows_terminal_profiles_that_duplicate_builtin_shells() {
+            let cmd = std::env::var("SystemRoot")
+                .map(|root| format!(r"{root}\System32\cmd.exe"))
+                .unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".to_string());
+            let powershell = std::env::var("SystemRoot")
+                .map(|root| format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe"))
+                .unwrap_or_else(|_| {
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe".to_string()
+                });
+            let wsl = std::env::var("SystemRoot")
+                .map(|root| format!(r"{root}\System32\wsl.exe"))
+                .unwrap_or_else(|_| r"C:\Windows\System32\wsl.exe".to_string());
+            let settings = format!(
+                r#"{{
+                    "profiles": {{ "list": [
+                        {{ "guid": "{{0caa0dad-35be-5f56-a8ff-afceeeaa6101}}", "name": "命令提示符",
+                           "commandline": {cmd} }},
+                        {{ "guid": "{{61c54bbd-c2c6-5271-96e7-009a87ff44bf}}", "name": "Windows PowerShell",
+                           "commandline": {powershell} }},
+                        {{ "guid": "{{12121212-1212-1212-1212-121212121212}}", "name": "Ubuntu",
+                           "commandline": {wsl} }},
+                        {{ "guid": "{{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}}", "name": "PowerShell no logo",
+                           "commandline": {powershell_flag} }}
+                    ] }}
+                }}"#,
+                cmd = serde_json::to_string(&cmd).unwrap(),
+                powershell = serde_json::to_string(&powershell).unwrap(),
+                wsl = serde_json::to_string(&format!(r#"{wsl} -d Ubuntu"#)).unwrap(),
+                powershell_flag = serde_json::to_string(&format!("{powershell} -NoLogo")).unwrap(),
+            );
+            let builtins = [PathBuf::from(&cmd), PathBuf::from(&powershell)];
+            let (shells, _) = wt_profiles::profiles_from(&settings, &[], &builtins);
+            let ids: Vec<&str> = shells.iter().map(|shell| shell.id.as_str()).collect();
+            assert_eq!(
+                ids,
+                vec![
+                    "wt:12121212-1212-1212-1212-121212121212",
+                    "wt:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                ]
+            );
+        }
+    }
+    /// Windows Terminal profiles imported as bare PTY shells. The commandline
+    /// is re-read and re-checked on every list and every spawn; nothing the
+    /// frontend stores is executed.
+    mod wt_profiles {
+        use std::collections::BTreeMap;
+        use std::path::{Path, PathBuf};
+
+        use serde::Deserialize;
+
+        const WT_ID_PREFIX: &str = "wt:";
+        const POWERSHELL_FLAGS: &[&str] = &["-NoLogo", "-NoProfile", "-NoExit"];
+        const BASH_FLAGS: &[&str] = &["-i", "-l", "--login"];
+
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub(super) struct Launch {
+            pub(super) name: String,
+            pub(super) program: PathBuf,
+            pub(super) args: Vec<String>,
+        }
+
+        #[derive(Deserialize)]
+        struct SettingsFile {
+            profiles: Option<Profiles>,
+        }
+
+        #[derive(Deserialize)]
+        struct Profiles {
+            list: Option<Vec<RawProfile>>,
+        }
+
+        #[derive(Deserialize)]
+        struct FragmentFile {
+            profiles: Option<Vec<RawProfile>>,
+        }
+
+        #[derive(Deserialize, Default)]
+        struct RawProfile {
+            guid: Option<String>,
+            name: Option<String>,
+            commandline: Option<String>,
+            hidden: Option<bool>,
+            source: Option<String>,
+            updates: Option<String>,
+        }
+
+        #[derive(Clone, Debug)]
+        struct Profile {
+            guid: String,
+            name: String,
+            commandline: Option<String>,
+            hidden: bool,
+        }
+
+        pub(super) fn list_profiles(builtins: &[PathBuf]) -> Vec<super::super::ShellInfo> {
+            load()
+                .into_iter()
+                .filter_map(|profile| {
+                    let launch = accept(&profile)?;
+                    if duplicates_builtin(&launch, builtins) {
+                        return None;
+                    }
+                    Some(super::super::ShellInfo {
+                        id: format!("{WT_ID_PREFIX}{}", profile.guid),
+                        name: profile.name,
+                        path: launch.program.to_string_lossy().into_owned(),
+                        integrated: false,
+                    })
+                })
+                .collect()
+        }
+
+        fn duplicates_builtin(launch: &Launch, builtins: &[PathBuf]) -> bool {
+            if !launch.args.is_empty() {
+                return false;
+            }
+            let program =
+                std::fs::canonicalize(&launch.program).unwrap_or_else(|_| launch.program.clone());
+            builtins.iter().any(|builtin| {
+                std::fs::canonicalize(builtin).unwrap_or_else(|_| builtin.clone()) == program
+            })
+        }
+
+        pub(super) fn resolve_launch(id: &str) -> Option<Launch> {
+            let guid = normalize_guid(id.trim().strip_prefix(WT_ID_PREFIX)?);
+            load()
+                .into_iter()
+                .find(|profile| profile.guid.eq_ignore_ascii_case(&guid))
+                .and_then(|profile| accept(&profile))
+        }
+
+        fn load() -> Vec<Profile> {
+            let mut profiles = BTreeMap::new();
+            for path in settings_paths() {
+                merge_settings(&mut profiles, &read_to_string(&path));
+            }
+            for path in fragment_files() {
+                merge_fragment(&mut profiles, &read_to_string(&path));
+            }
+            profiles.into_values().collect()
+        }
+
+        fn settings_paths() -> Vec<PathBuf> {
+            let mut out = Vec::new();
+            if let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+                let packages = local.join("Packages");
+                if let Ok(entries) = std::fs::read_dir(&packages) {
+                    let mut stores: Vec<PathBuf> = entries
+                        .filter_map(|entry| entry.ok())
+                        .map(|entry| entry.path())
+                        .filter(|path| {
+                            path.file_name()
+                                .and_then(|name| name.to_str())
+                                .is_some_and(|name| name.starts_with("Microsoft.WindowsTerminal"))
+                        })
+                        .map(|path| path.join("LocalState").join("settings.json"))
+                        .filter(|path| path.is_file())
+                        .collect();
+                    stores.sort();
+                    out.extend(stores);
+                }
+                for dir in ["Windows Terminal", "Windows Terminal Preview"] {
+                    let path = local.join("Microsoft").join(dir).join("settings.json");
+                    if path.is_file() {
+                        out.push(path);
+                    }
+                }
+            }
+            out
+        }
+
+        fn fragment_files() -> Vec<PathBuf> {
+            let mut roots = Vec::new();
+            if let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+                roots.push(
+                    local
+                        .join("Microsoft")
+                        .join("Windows Terminal")
+                        .join("Fragments"),
+                );
+            }
+            if let Some(data) = std::env::var_os("PROGRAMDATA").map(PathBuf::from) {
+                roots.push(
+                    data.join("Microsoft")
+                        .join("Windows Terminal")
+                        .join("Fragments"),
+                );
+            }
+            let mut files = Vec::new();
+            for root in roots {
+                collect_json(&root, &mut files);
+            }
+            files.sort();
+            files
+        }
+
+        fn collect_json(dir: &Path, out: &mut Vec<PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in entries.filter_map(|entry| entry.ok()) {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect_json(&path, out);
+                } else if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                    out.push(path);
+                }
+            }
+        }
+
+        fn read_to_string(path: &Path) -> String {
+            std::fs::read_to_string(path).unwrap_or_default()
+        }
+
+        fn merge_settings(profiles: &mut BTreeMap<String, Profile>, text: &str) -> bool {
+            let Ok(file) = serde_json::from_str::<SettingsFile>(text) else {
+                return false;
+            };
+            let Some(list) = file.profiles.and_then(|profiles| profiles.list) else {
+                return false;
+            };
+            for raw in list {
+                merge_raw(profiles, raw);
+            }
+            true
+        }
+
+        fn merge_fragment(profiles: &mut BTreeMap<String, Profile>, text: &str) {
+            let Ok(file) = serde_json::from_str::<FragmentFile>(text) else {
+                return;
+            };
+            for raw in file.profiles.unwrap_or_default() {
+                merge_raw(profiles, raw);
+            }
+        }
+
+        fn merge_raw(profiles: &mut BTreeMap<String, Profile>, raw: RawProfile) {
+            let Some(guid) = raw.guid.as_deref().map(normalize_guid) else {
+                if let Some(target) = raw.updates.as_deref().map(normalize_guid) {
+                    if let Some(profile) = profiles.get_mut(&target) {
+                        if raw.hidden == Some(true) {
+                            profile.hidden = true;
+                        }
+                        if let Some(name) = nonempty(&raw.name) {
+                            profile.name = name;
+                        }
+                        if let Some(commandline) = nonempty(&raw.commandline) {
+                            profile.commandline = Some(commandline);
+                        }
+                    }
+                }
+                return;
+            };
+            let entry = profiles.entry(guid.clone()).or_insert_with(|| Profile {
+                guid,
+                name: String::new(),
+                commandline: None,
+                hidden: false,
+            });
+            if let Some(name) = nonempty(&raw.name) {
+                entry.name = name;
+            }
+            if raw.commandline.is_some() {
+                entry.commandline = nonempty(&raw.commandline);
+            }
+            if let Some(hidden) = raw.hidden {
+                entry.hidden = hidden;
+            }
+            let _ = raw.source;
+        }
+
+        fn accept(profile: &Profile) -> Option<Launch> {
+            match accept_reason(profile) {
+                Ok(launch) => Some(launch),
+                Err(reason) => {
+                    log::info!(
+                        "skipping Windows Terminal profile '{}': {reason}",
+                        display_name(profile)
+                    );
+                    None
+                }
+            }
+        }
+
+        fn accept_reason(profile: &Profile) -> Result<Launch, String> {
+            if profile.hidden || profile.guid.is_empty() {
+                return Err("hidden or missing guid".into());
+            }
+            let Some(commandline) = profile.commandline.as_deref().map(str::trim) else {
+                return Err("no commandline".into());
+            };
+            if commandline.is_empty() {
+                return Err("no commandline".into());
+            }
+            let expanded = expand_env(commandline);
+            let tokens = split_commandline(&expanded);
+            let program = tokens
+                .first()
+                .map(|token| token.trim_matches('"').to_string())
+                .filter(|token| !token.is_empty())
+                .ok_or_else(|| format!("empty program in {commandline:?}"))?;
+            let args = &tokens[1..];
+            let path = PathBuf::from(&program);
+            if !path.is_file() {
+                return Err(format!("program not found: {program} from {commandline:?}"));
+            }
+            let kind = exe_kind(&path).ok_or_else(|| format!("exe not allowlisted: {program}"))?;
+            if !args_allowed(kind, args) {
+                return Err(format!("args not allowlisted: {args:?}"));
+            }
+            let canonical = std::fs::canonicalize(&path).unwrap_or(path);
+            Ok(Launch {
+                name: display_name(profile),
+                program: canonical,
+                args: args.to_vec(),
+            })
+        }
+
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum ExeKind {
+            Cmd,
+            PowerShell,
+            Bash,
+            Wsl,
+        }
+
+        fn exe_kind(path: &Path) -> Option<ExeKind> {
+            match path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.to_ascii_lowercase())
+                .as_deref()
+            {
+                Some("cmd.exe") => Some(ExeKind::Cmd),
+                Some("powershell.exe" | "pwsh.exe") => Some(ExeKind::PowerShell),
+                Some("bash.exe") => Some(ExeKind::Bash),
+                Some("wsl.exe") => Some(ExeKind::Wsl),
+                _ => None,
+            }
+        }
+
+        fn args_allowed(kind: ExeKind, args: &[String]) -> bool {
+            match kind {
+                ExeKind::Cmd => args.is_empty(),
+                ExeKind::PowerShell => args.iter().all(|arg| {
+                    POWERSHELL_FLAGS
+                        .iter()
+                        .any(|flag| flag.eq_ignore_ascii_case(arg))
+                }),
+                ExeKind::Bash => args
+                    .iter()
+                    .all(|arg| BASH_FLAGS.iter().any(|flag| flag.eq_ignore_ascii_case(arg))),
+                ExeKind::Wsl => wsl_distro_arg(args).is_some(),
+            }
+        }
+
+        fn wsl_distro_arg(args: &[String]) -> Option<()> {
+            if args.len() != 2 {
+                return None;
+            }
+            let flag = args[0].as_str();
+            if !matches!(flag, "-d" | "--distribution") {
+                return None;
+            }
+            crate::modules::workspace::validate_wsl_distro_name(&args[1]).ok()
+        }
+
+        fn display_name(profile: &Profile) -> String {
+            if profile.name.is_empty() {
+                profile.guid.clone()
+            } else {
+                profile.name.clone()
+            }
+        }
+
+        fn normalize_guid(guid: &str) -> String {
+            guid.trim()
+                .trim_matches(|c| c == '{' || c == '}')
+                .to_ascii_lowercase()
+        }
+
+        fn nonempty(value: &Option<String>) -> Option<String> {
+            value
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        }
+
+        fn expand_env(input: &str) -> String {
+            let mut out = String::with_capacity(input.len());
+            let bytes = input.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() {
+                if bytes[i] == b'%' {
+                    if let Some(end) = bytes[i + 1..].iter().position(|b| *b == b'%') {
+                        let name = &input[i + 1..i + 1 + end];
+                        if let Some(value) = env_value(name) {
+                            out.push_str(&value);
+                            i += end + 2;
+                            continue;
+                        }
+                    }
+                }
+                let ch = input[i..].chars().next().unwrap_or('\u{FFFD}');
+                out.push(ch);
+                i += ch.len_utf8();
+            }
+            out
+        }
+
+        fn env_value(name: &str) -> Option<String> {
+            const ALLOWED: &[&str] = &[
+                "SystemRoot",
+                "ProgramFiles",
+                "ProgramFiles(x86)",
+                "LocalAppData",
+                "UserProfile",
+            ];
+            if !ALLOWED.iter().any(|item| item.eq_ignore_ascii_case(name)) {
+                return None;
+            }
+            std::env::var(name).ok()
+        }
+
+        /// Windows command-line quoting: whitespace separates tokens, a double
+        /// quote toggles a quoted span, and a backslash escapes a quote only
+        /// when it immediately precedes one.
+        fn split_commandline(input: &str) -> Vec<String> {
+            let mut out = Vec::new();
+            let mut token = String::new();
+            let mut quoted = false;
+            let mut chars = input.chars().peekable();
+            let mut started = false;
+            while let Some(ch) = chars.next() {
+                match ch {
+                    '"' => {
+                        started = true;
+                        quoted = !quoted;
+                    }
+                    '\\' if quoted && chars.peek() == Some(&'"') => {
+                        started = true;
+                        token.push(chars.next().unwrap_or('"'));
+                    }
+                    c if c.is_whitespace() && !quoted => {
+                        if started {
+                            out.push(std::mem::take(&mut token));
+                            started = false;
+                        }
+                    }
+                    c => {
+                        started = true;
+                        token.push(c);
+                    }
+                }
+            }
+            if started {
+                out.push(token);
+            }
+            out
+        }
+
+        #[cfg(test)]
+        pub(super) fn profiles_from(
+            settings: &str,
+            fragments: &[&str],
+            builtins: &[PathBuf],
+        ) -> (Vec<super::super::ShellInfo>, Vec<String>) {
+            let mut profiles = BTreeMap::new();
+            let parsed = merge_settings(&mut profiles, settings);
+            for fragment in fragments {
+                merge_fragment(&mut profiles, fragment);
+            }
+            assert!(parsed, "settings json failed: {settings}");
+            let mut shells = Vec::new();
+            let mut skipped = Vec::new();
+            for profile in profiles.into_values() {
+                match accept_reason(&profile) {
+                    Ok(launch) if duplicates_builtin(&launch, builtins) => {
+                        skipped.push(format!("{}: duplicates builtin", profile.guid));
+                    }
+                    Ok(launch) => shells.push(super::super::ShellInfo {
+                        id: format!("{WT_ID_PREFIX}{}", profile.guid),
+                        name: profile.name,
+                        path: launch.program.to_string_lossy().into_owned(),
+                        integrated: false,
+                    }),
+                    Err(reason) => skipped.push(format!("{}: {reason}", profile.guid)),
+                }
+            }
+            (shells, skipped)
+        }
+
+        #[cfg(test)]
+        pub(super) fn launch_from(settings: &str, fragments: &[&str], id: &str) -> Option<Launch> {
+            let guid = normalize_guid(id.trim().strip_prefix(WT_ID_PREFIX)?);
+            let mut profiles = BTreeMap::new();
+            merge_settings(&mut profiles, settings);
+            for fragment in fragments {
+                merge_fragment(&mut profiles, fragment);
+            }
+            profiles
+                .into_values()
+                .find(|profile| profile.guid.eq_ignore_ascii_case(&guid))
+                .and_then(|profile| accept(&profile))
+        }
     }
 }
 
@@ -1107,7 +1772,9 @@ mod tests {
 
     use portable_pty::CommandBuilder;
 
-    use super::{apply_common, sanitize_shell_override, ShellControlEnv};
+    use super::{
+        apply_common, sanitize_shell_override, shell_override_allowed, ShellControlEnv, ShellInfo,
+    };
 
     #[test]
     fn rejects_non_enumerated_override() {
@@ -1122,6 +1789,35 @@ mod tests {
     fn empty_or_missing_override_is_none() {
         assert_eq!(sanitize_shell_override(Some("   ".into())), None);
         assert_eq!(sanitize_shell_override(None), None);
+    }
+
+    #[test]
+    fn accepts_enumerated_id_without_touching_windows_terminal() {
+        let shells = vec![
+            ShellInfo::builtin(
+                r"C:\Windows\System32\cmd.exe",
+                r"C:\Windows\System32\cmd.exe",
+                false,
+            ),
+            ShellInfo {
+                id: "wt:61c54bbd-c2c6-5271-96e7-009a87ff44bf".into(),
+                name: "Windows PowerShell".into(),
+                path: r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe".into(),
+                integrated: false,
+            },
+        ];
+        assert!(shell_override_allowed(
+            "wt:61c54bbd-c2c6-5271-96e7-009a87ff44bf",
+            None,
+            &shells,
+        ));
+        assert!(shell_override_allowed(
+            r"C:\Windows\System32\cmd.exe",
+            None,
+            &shells,
+        ));
+        assert!(!shell_override_allowed("wt:not-listed", None, &shells));
+        assert!(!shell_override_allowed(r"C:\evil\cmd.exe", None, &shells));
     }
 
     #[test]
