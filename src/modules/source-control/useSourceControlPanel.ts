@@ -48,6 +48,7 @@ type SourceControlEntry = {
   statusCode: string;
   originalPath: string | null;
   untracked: boolean;
+  isSubmodule: boolean;
 };
 
 export type CheckState = "checked" | "indeterminate" | "unchecked";
@@ -63,6 +64,7 @@ export type SourceControlFileEntry = {
   staged: boolean;
   unstaged: boolean;
   untracked: boolean;
+  isSubmodule: boolean;
   insertions: number;
   deletions: number;
 };
@@ -194,6 +196,7 @@ function makeEntry(
     statusCode: statusCodeForMode(mode, file),
     originalPath: file.originalPath,
     untracked: file.untracked,
+    isSubmodule: file.isSubmodule,
   };
 }
 
@@ -332,6 +335,7 @@ function optimisticUnstage(
         staged: false,
         unstaged: true,
         untracked: false,
+        isSubmodule: file.isSubmodule,
         statusLabel: "Deleted",
         insertions: 0,
         deletions: file.deletions,
@@ -344,6 +348,7 @@ function optimisticUnstage(
         staged: false,
         unstaged: true,
         untracked: true,
+        isSubmodule: file.isSubmodule,
         statusLabel: "Untracked",
         insertions: 0,
         deletions: 0,
@@ -485,6 +490,7 @@ export function useSourceControlPanel(
         staged: file.staged,
         unstaged: file.unstaged,
         untracked: file.untracked,
+        isSubmodule: file.isSubmodule,
         insertions: file.insertions,
         deletions: file.deletions,
       });
@@ -916,6 +922,7 @@ export function useSourceControlPanel(
           statusCode: entry.statusCode,
           originalPath: entry.originalPath,
           untracked: entry.untracked,
+          isSubmodule: entry.isSubmodule,
         },
       });
     },

@@ -13,9 +13,22 @@ export type GitChangedFile = {
   staged: boolean;
   unstaged: boolean;
   untracked: boolean;
+  isSubmodule: boolean;
   statusLabel: string;
   insertions: number;
   deletions: number;
+};
+
+export type GitSubmoduleEntry = {
+  name: string;
+  path: string;
+  state: "initialized" | "uninitialized" | "modified" | "conflict";
+  headSha: string | null;
+  describe: string | null;
+};
+
+export type GitSubmoduleListResult = {
+  submodules: GitSubmoduleEntry[];
 };
 
 export type GitStatusSnapshot = {

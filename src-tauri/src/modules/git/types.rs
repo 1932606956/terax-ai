@@ -26,11 +26,34 @@ pub struct GitChangedFile {
     pub staged: bool,
     pub unstaged: bool,
     pub untracked: bool,
+    /// Porcelain v2 `<sub>` started with `S`: the path is a submodule (gitlink).
+    pub is_submodule: bool,
     pub status_label: String,
     /// Lines added against HEAD. Zero for untracked files until they are staged.
     pub insertions: u32,
     /// Lines removed against HEAD.
     pub deletions: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSubmoduleEntry {
+    /// Section name in `.gitmodules`, which may differ from `path`.
+    pub name: String,
+    /// Path relative to the repository root, forward slashes.
+    pub path: String,
+    /// `initialized` | `uninitialized` | `modified` | `conflict`
+    pub state: String,
+    /// The SHA recorded in the index.
+    pub head_sha: Option<String>,
+    /// `git describe` output inside the submodule, when it resolves.
+    pub describe: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSubmoduleListResult {
+    pub submodules: Vec<GitSubmoduleEntry>,
 }
 
 #[derive(Serialize)]
@@ -192,6 +215,7 @@ mod serde_shape_tests {
             staged: true,
             unstaged: false,
             untracked: false,
+            is_submodule: true,
             status_label: "renamed".into(),
             insertions: 12,
             deletions: 3,
@@ -207,6 +231,7 @@ mod serde_shape_tests {
                 "staged": true,
                 "unstaged": false,
                 "untracked": false,
+                "isSubmodule": true,
                 "statusLabel": "renamed",
                 "insertions": 12,
                 "deletions": 3,

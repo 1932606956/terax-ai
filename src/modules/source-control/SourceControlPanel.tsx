@@ -37,7 +37,11 @@ import {
 import { t } from "@/i18n/zh";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { type GitBranchEntry, git } from "@/modules/git";
+import {
+  type GitBranchEntry,
+  type GitSubmoduleEntry,
+  git,
+} from "@/modules/git";
 import { FileIcon } from "@/modules/explorer/FileIcon";
 import {
   copyToClipboard,
@@ -52,6 +56,7 @@ import {
   AiContentGenerator02Icon,
   Alert02Icon,
   ArrowDown01Icon,
+  ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
@@ -105,6 +110,7 @@ type Props = {
   onNavigateToPath?: (path: string) => void;
   repositoryTarget: SourceControlRepositoryTarget;
   onFollowRepositoryContext: () => void;
+  onOpenRepository?: (repoRoot: string) => void;
 };
 
 const SOURCE_CONTROL_TOOLTIP_CLASS =
@@ -166,6 +172,31 @@ function checkboxValue(state: CheckState): boolean | "indeterminate" {
   return false;
 }
 
+// Enough hops for any real nested-submodule layout; also breaks a repo cycle
+// on a corrupt checkout.
+const SUPERPROJECT_CHAIN_LIMIT = 20;
+
+/**
+ * The outermost superproject of `repoRoot`, or `null` when it is not a
+ * submodule checkout. A chain that errors midway falls back to the deepest
+ * root already resolved.
+ */
+async function topmostSuperproject(repoRoot: string): Promise<string | null> {
+  const immediate = await git.superproject(repoRoot);
+  if (!immediate) return null;
+  let topmost = immediate;
+  try {
+    for (let hop = 0; hop < SUPERPROJECT_CHAIN_LIMIT; hop += 1) {
+      const next = await git.superproject(topmost);
+      if (!next || next === topmost) break;
+      topmost = next;
+    }
+  } catch {
+    // Keep the deepest root that resolved rather than hiding the way back.
+  }
+  return topmost;
+}
+
 function BranchDropdown({
   repoRoot,
   repoLabel,
@@ -173,6 +204,7 @@ function BranchDropdown({
   repositoryTarget,
   onFollowRepositoryContext,
   onNavigateToPath,
+  onOpenRepository,
   onRefresh,
 }: {
   repoRoot: string | null;
@@ -181,10 +213,12 @@ function BranchDropdown({
   repositoryTarget: SourceControlRepositoryTarget;
   onFollowRepositoryContext: () => void;
   onNavigateToPath?: (path: string) => void;
+  onOpenRepository?: (repoRoot: string) => void;
   onRefresh: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<GitBranchEntry[]>([]);
+  const [submodules, setSubmodules] = useState<GitSubmoduleEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -195,25 +229,32 @@ function BranchDropdown({
     const id = ++requestRef.current;
     if (!repoRoot) {
       setBranches([]);
+      setSubmodules([]);
       setError(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
-    try {
-      const result = await git.listBranches(repoRoot);
-      if (id !== requestRef.current) return;
-      setBranches(result.branches);
-    } catch (e) {
-      if (id !== requestRef.current) return;
-      setError(String(e));
+    // Child repositories still belong in the dropdown when only the branch
+    // listing fails, so the two loads settle independently.
+    const [branchResult, submoduleResult] = await Promise.allSettled([
+      git.listBranches(repoRoot),
+      git.submodules(repoRoot),
+    ]);
+    if (id !== requestRef.current) return;
+    if (branchResult.status === "fulfilled") {
+      setBranches(branchResult.value.branches);
+    } else {
+      setError(String(branchResult.reason));
       setBranches([]);
-    } finally {
-      if (id === requestRef.current) {
-        setLoading(false);
-      }
     }
+    setSubmodules(
+      submoduleResult.status === "fulfilled"
+        ? submoduleResult.value.submodules
+        : [],
+    );
+    setLoading(false);
   }, [repoRoot]);
 
   useEffect(() => {
@@ -308,12 +349,13 @@ function BranchDropdown({
             <Spinner className="size-3" />
             {t("scm.loadingBranches")}
           </div>
-        ) : error ? (
-          <div className="px-3 py-3 text-[11px] leading-snug text-destructive">
-            {error}
-          </div>
         ) : (
           <>
+            {error ? (
+              <div className="px-3 py-3 text-[11px] leading-snug text-destructive">
+                {error}
+              </div>
+            ) : null}
             {localBranches.length > 0 && (
               <>
                 <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
@@ -378,7 +420,53 @@ function BranchDropdown({
                 </DropdownMenuGroup>
               </>
             )}
-            {branches.length === 0 && (
+            {submodules.length > 0 && onOpenRepository && (
+              <>
+                {(localBranches.length > 0 || worktrees.length > 0) && (
+                  <DropdownMenuSeparator />
+                )}
+                <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
+                  {t("scm.childRepositories")}
+                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  {submodules.map((sm) => {
+                    const uninitialized = sm.state === "uninitialized";
+                    return (
+                      <DropdownMenuItem
+                        key={sm.path}
+                        disabled={uninitialized}
+                        onSelect={() => {
+                          if (!repoRoot) return;
+                          onOpenRepository(
+                            joinPath(
+                              repoRoot.replace(/\\/g, "/"),
+                              sm.path.replace(/\\/g, "/"),
+                            ),
+                          );
+                        }}
+                        className="flex cursor-pointer items-center gap-2 text-[12px]"
+                      >
+                        <HugeiconsIcon
+                          icon={FolderGitTwoIcon}
+                          size={14}
+                          strokeWidth={1.5}
+                          className="shrink-0 text-muted-foreground"
+                        />
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate">{sm.name}</span>
+                          <span className="truncate text-[10px] text-muted-foreground">
+                            {uninitialized
+                              ? `${sm.path} · ${t("scm.uninitialized")}`
+                              : sm.path}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuGroup>
+              </>
+            )}
+            {!error && branches.length === 0 && submodules.length === 0 && (
               <div className="px-3 py-3 text-[11px] text-muted-foreground">
                 {t("scm.noBranches")}
               </div>
@@ -399,6 +487,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onNavigateToPath,
   repositoryTarget,
   onFollowRepositoryContext,
+  onOpenRepository,
 }: Props) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
   const refreshAnimationRef = useRef<number | null>(null);
@@ -407,6 +496,30 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const stageAnchorRef = useRef<string | null>(null);
+  const [parentRepoRoot, setParentRepoRoot] = useState<string | null>(null);
+  const loadedRepoRoot = scm.repo?.repoRoot ?? null;
+
+  // A submodule checkout runs plain git commands from its own root, so only git
+  // can tell the panel that a parent repository exists to go back to. "返回主仓库"
+  // means the outermost repository, so walk the chain rather than one hop.
+  useEffect(() => {
+    if (!open || !loadedRepoRoot) {
+      setParentRepoRoot(null);
+      return;
+    }
+    setParentRepoRoot(null);
+    let cancelled = false;
+    topmostSuperproject(loadedRepoRoot)
+      .then((root) => {
+        if (!cancelled) setParentRepoRoot(root);
+      })
+      .catch(() => {
+        if (!cancelled) setParentRepoRoot(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, loadedRepoRoot]);
 
   useEffect(() => {
     return () => {
@@ -702,6 +815,19 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       <aside className="flex h-full min-w-0 flex-col [contain:layout_style]">
         <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 pb-2.5 pt-3">
           <div className="flex min-w-0 items-center gap-1.5">
+            {parentRepoRoot && onOpenRepository ? (
+              <IconActionButton
+                label={t("scm.backToMainRepository")}
+                onClick={() => onOpenRepository(parentRepoRoot)}
+                side="bottom"
+              >
+                <HugeiconsIcon
+                  icon={ArrowLeft01Icon}
+                  size={14}
+                  strokeWidth={1.9}
+                />
+              </IconActionButton>
+            ) : null}
             <BranchDropdown
               repoRoot={
                 fixedTargetPending ? null : (scm.repo?.repoRoot ?? null)
@@ -715,6 +841,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               repositoryTarget={repositoryTarget}
               onFollowRepositoryContext={onFollowRepositoryContext}
               onNavigateToPath={onNavigateToPath}
+              onOpenRepository={onOpenRepository}
               onRefresh={handleRefresh}
             />
             {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
@@ -1072,6 +1199,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             onToggleStageFile={handleToggleStageFile}
                             onDiscardFile={scm.requestDiscardFile}
                             onOpenFile={onOpenFile}
+                            onOpenRepository={onOpenRepository}
                           />
                         </div>
                       );
@@ -1173,6 +1301,7 @@ type RowRendererProps = {
   ) => Promise<void> | void;
   onDiscardFile: (entry: SourceControlFileEntry) => void;
   onOpenFile?: (absolutePath: string) => void;
+  onOpenRepository?: (repoRoot: string) => void;
 };
 
 /**
@@ -1208,7 +1337,8 @@ function DiffCounts({
   );
 }
 
-const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {  const { row } = props;
+const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
+  const { row } = props;
   switch (row.kind) {
     case "banner-diverged":
       return <DivergedBanner />;
@@ -1279,6 +1409,7 @@ const EntryRow = memo(function EntryRow({
   onToggleStageFile,
   onDiscardFile,
   onOpenFile,
+  onOpenRepository,
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "entry" }>;
 }) {
@@ -1298,6 +1429,34 @@ const EntryRow = memo(function EntryRow({
     : null;
   const isDeleted = entry.statusCode === "D";
   const revealLabel = t("ctx.reveal");
+  const navigable = entry.isSubmodule && !!onOpenRepository && !isDeleted;
+  const submoduleNavTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (submoduleNavTimer.current !== null) {
+        window.clearTimeout(submoduleNavTimer.current);
+        submoduleNavTimer.current = null;
+      }
+    };
+  }, []);
+
+  // A double-click on a submodule row must navigate, not open the pointer diff
+  // on the first click; give the second click a moment to arrive.
+  const handleRowClick = () => {
+    onFocusRow(row.key);
+    if (!navigable) {
+      void onSelectFile(entry);
+      return;
+    }
+    if (submoduleNavTimer.current !== null) {
+      window.clearTimeout(submoduleNavTimer.current);
+    }
+    submoduleNavTimer.current = window.setTimeout(() => {
+      submoduleNavTimer.current = null;
+      void onSelectFile(entry);
+    }, 200);
+  };
 
   return (
     <ContextMenu>
@@ -1309,6 +1468,14 @@ const EntryRow = memo(function EntryRow({
           role="option"
           aria-selected={isSelected}
           onMouseDown={() => onFocusRow(row.key)}
+          onDoubleClick={() => {
+            if (!navigable) return;
+            if (submoduleNavTimer.current !== null) {
+              window.clearTimeout(submoduleNavTimer.current);
+              submoduleNavTimer.current = null;
+            }
+            if (absolutePath) onOpenRepository?.(absolutePath);
+          }}
           className={cn(
             "group relative flex h-[30px] items-center gap-2 rounded-md pl-2 pr-2 transition-all duration-100",
             focused
@@ -1330,13 +1497,19 @@ const EntryRow = memo(function EntryRow({
           />
           <button
             type="button"
-            onClick={() => {
-              onFocusRow(row.key);
-              void onSelectFile(entry);
-            }}
+            onClick={handleRowClick}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
           >
-            <FileIcon name={fileName} className="size-4 shrink-0" />
+            {entry.isSubmodule ? (
+              <HugeiconsIcon
+                icon={FolderGitTwoIcon}
+                size={16}
+                strokeWidth={1.6}
+                className="shrink-0 text-muted-foreground"
+              />
+            ) : (
+              <FileIcon name={fileName} className="size-4 shrink-0" />
+            )}
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5 leading-none">
               <span
                 className={cn(
@@ -1357,11 +1530,15 @@ const EntryRow = memo(function EntryRow({
             </div>
           </button>
 
-          <DiffCounts
-            insertions={entry.insertions}
-            deletions={entry.deletions}
-            label={fileName}
-          />
+          {/* Numstat reports +1/-1 for a gitlink bump, which reads like line
+              counts it is not; a submodule row shows none. */}
+          {!entry.isSubmodule && (
+            <DiffCounts
+              insertions={entry.insertions}
+              deletions={entry.deletions}
+              label={fileName}
+            />
+          )}
 
           {showDiscard ? (
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">

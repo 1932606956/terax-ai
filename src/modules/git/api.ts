@@ -20,6 +20,7 @@ import type {
   GitPushResult,
   GitRepoInfo,
   GitStatusSnapshot,
+  GitSubmoduleListResult,
   GitWatchInfo,
   ProjectConfig,
   RestoreReport,
@@ -159,6 +160,16 @@ export const git = {
     invoke<void>("git_checkout_branch", {
       repoRoot,
       branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  submodules: (repoRoot: string) =>
+    invoke<GitSubmoduleListResult>("git_submodules", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  superproject: (repoRoot: string) =>
+    invoke<string | null>("git_superproject", {
+      repoRoot,
       workspace: currentWorkspaceEnv(),
     }),
 

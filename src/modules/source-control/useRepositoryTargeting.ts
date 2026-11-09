@@ -93,6 +93,20 @@ export function useRepositoryTargeting({
     [openSourceControl, resolveRepository, spaceId, workspaceKey],
   );
 
+  // Switch the panel to a repository whose root the caller already knows, e.g.
+  // a submodule picked in the sidebar. No path resolution: the root came from
+  // git, so a resolve round trip would only add a stale-repo window.
+  const openRepositoryAt = useCallback(
+    (repoRoot: string) => {
+      sourceControlRequestRef.current += 1;
+      setTargets((current) =>
+        setRepositoryTargetForSpace(current, spaceId, workspaceKey, repoRoot),
+      );
+      openSourceControl();
+    },
+    [openSourceControl, spaceId, workspaceKey],
+  );
+
   const openGitHistory = useCallback(
     async (path: string) => {
       const repo = await resolveRepository(path, historyRequestRef);
@@ -112,6 +126,7 @@ export function useRepositoryTargeting({
   return {
     repositoryTarget,
     openInSourceControl,
+    openRepositoryAt,
     openGitHistory,
     followActiveContext,
   };

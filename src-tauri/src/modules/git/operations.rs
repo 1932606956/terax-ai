@@ -2,7 +2,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
 use crate::modules::git::errors::{GitError, Result};
-use crate::modules::git::parser::parse_porcelain_v2;
+use crate::modules::git::parser::{parse_porcelain_v2, parse_submodule_status_line, submodule_state};
 use crate::modules::git::process::{
     ensure_git_available, ensure_success, git_show_text, git_stdout_line_opt, git_stdout_lines,
     read_text_file, run_git, run_git_capped,
@@ -10,8 +10,8 @@ use crate::modules::git::process::{
 use crate::modules::git::types::{
     DiscardEntry, GitBranchEntry, GitBranchListResult, GitChangedFile, GitCommitFileChange,
     GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot,
-    GitPushResult, GitRepoInfo, GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS,
-    NETWORK_TIMEOUT_SECS,
+    GitPushResult, GitRepoInfo, GitStatusSnapshot, GitSubmoduleEntry, GitSubmoduleListResult,
+    TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::untracked;
 use crate::modules::git::utils::{
@@ -1304,6 +1304,94 @@ pub fn checkout_branch(
         DEFAULT_TIMEOUT_SECS,
     )?;
     ensure_success(&output, "git checkout failed")
+}
+
+/// Child repositories declared by `.gitmodules`, including uninitialized ones.
+pub fn submodules(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitSubmoduleListResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    // `git submodule status` prints paths, not section names; `.gitmodules`
+    // gives the name each path was declared under.
+    let mut declared: Vec<(String, String)> = Vec::new();
+    if let Ok(lines) = git_stdout_lines(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        [
+            "config",
+            "-f",
+            ".gitmodules",
+            "--get-regexp",
+            r"^submodule\..*\.path$",
+        ],
+    ) {
+        for line in &lines {
+            let Some((key, path)) = line.split_once(' ') else {
+                continue;
+            };
+            let Some(name) = key
+                .strip_prefix("submodule.")
+                .and_then(|rest| rest.strip_suffix(".path"))
+            else {
+                continue;
+            };
+            declared.push((path.replace('\\', "/"), name.to_string()));
+        }
+    }
+
+    let mut submodules = Vec::new();
+    for line in git_stdout_lines(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["submodule", "status", "--recursive"],
+    )? {
+        let Some(parsed) = parse_submodule_status_line(&line) else {
+            continue;
+        };
+        let path = parsed.path.replace('\\', "/");
+        let name = declared
+            .iter()
+            .find(|(declared_path, _)| *declared_path == path)
+            .map(|(_, name)| name.clone())
+            .unwrap_or_else(|| path.rsplit('/').next().unwrap_or(path.as_str()).to_string());
+        submodules.push(GitSubmoduleEntry {
+            name,
+            path,
+            state: submodule_state(parsed.flag).to_string(),
+            head_sha: Some(parsed.sha),
+            describe: parsed.describe,
+        });
+    }
+    submodules.sort_by(|a, b| a.path.cmp(&b.path));
+
+    Ok(GitSubmoduleListResult { submodules })
+}
+
+/// The superproject root when `repo_root` is a submodule checkout, else `None`.
+pub fn superproject(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Option<String>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let Some(path) = git_stdout_line_opt(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["rev-parse", "--show-superproject-working-tree"],
+    )?
+    else {
+        return Ok(None);
+    };
+    let canonical = canonical_dir(registry, &path, &repo_root.workspace)?;
+    if !registry.is_authorized(&canonical.local_path) {
+        return Err(GitError::PathOutsideWorkspace(canonical.local_path));
+    }
+    Ok(Some(canonical.git_path))
 }
 
 #[cfg(test)]

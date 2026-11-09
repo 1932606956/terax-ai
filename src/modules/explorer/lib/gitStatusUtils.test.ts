@@ -16,6 +16,7 @@ function file(overrides: Partial<GitChangedFile>): GitChangedFile {
     staged: false,
     unstaged: false,
     untracked: false,
+    isSubmodule: false,
     statusLabel: "",
     insertions: 0,
     deletions: 0,

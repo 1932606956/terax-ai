@@ -378,6 +378,8 @@ pub fn run() {
             git::commands::git_remote_url,
             git::commands::git_list_branches,
             git::commands::git_checkout_branch,
+            git::commands::git_submodules,
+            git::commands::git_superproject,
             git::commands_review::git_merge_base,
             git::commands_review::git_diff_summary,
             git::commands_review::git_diff_file,

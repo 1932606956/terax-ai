@@ -16,6 +16,7 @@ function entry(path: string): SourceControlFileEntry {
     staged: false,
     unstaged: true,
     untracked: false,
+    isSubmodule: false,
     insertions: 0,
     deletions: 0,
   };

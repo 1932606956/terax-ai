@@ -873,6 +873,7 @@ export default function App() {
   const {
     repositoryTarget: sourceControlRepositoryTarget,
     openInSourceControl: handleOpenRepositoryInSourceControl,
+    openRepositoryAt: handleOpenRepositoryAt,
     openGitHistory: handleOpenGitHistoryForPath,
     followActiveContext: handleFollowRepositoryContext,
   } = useRepositoryTargeting({
@@ -1626,6 +1627,7 @@ export default function App() {
                           onFollowRepositoryContext={
                             handleFollowRepositoryContext
                           }
+                          onOpenRepository={handleOpenRepositoryAt}
                         />
                       )}
                     </div>
