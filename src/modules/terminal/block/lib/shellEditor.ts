@@ -1,5 +1,6 @@
 import "@/modules/terminal/block/block.css";
 
+import { t as tr } from "@/i18n/zh";
 import { unescapeForShell } from "@/lib/shellQuote";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import {
@@ -67,6 +68,10 @@ export type ShellEditorOptions = {
   onChange?: (text: string) => void;
 };
 
+/** The empty-input hint; `hint` is the shortcut that switches to the AI input. */
+export const shellPlaceholder = (hint: string) =>
+  `${tr("shell.runCommand")}  -  ${tr("shell.historyHint")}  ${hint} ${tr("shell.switchToAi")}`;
+
 export type ShellEditorHandle = {
   readonly view: EditorView;
   focus(): void;
@@ -74,6 +79,7 @@ export type ShellEditorHandle = {
   setValue(text: string): void;
   clear(): void;
   setEditable(editable: boolean): void;
+  setPlaceholder(text: string): void;
   retheme(fontFamily: string, fontSize: number, fontWeight: string): void;
   destroy(): void;
 };
@@ -351,6 +357,9 @@ const completionNav = Prec.highest(
   keymap.of([
     { key: "ArrowDown", run: moveCompletionSelection(true) },
     { key: "ArrowUp", run: moveCompletionSelection(false) },
+    { key: "Ctrl-n", run: moveCompletionSelection(true) },
+    { key: "Ctrl-p", run: moveCompletionSelection(false) },
+    { key: "Ctrl-y", run: acceptCompletion },
     { key: "Escape", run: closeCompletion },
   ]),
 );
@@ -359,6 +368,7 @@ export function createShellEditor(opts: ShellEditorOptions): ShellEditorHandle {
   const themeComp = new Compartment();
   const highlightComp = new Compartment();
   const editableComp = new Compartment();
+  const placeholderComp = new Compartment();
 
   const clear = (view: EditorView) =>
     view.dispatch({
@@ -425,7 +435,7 @@ export function createShellEditor(opts: ShellEditorOptions): ShellEditorHandle {
       completionNav,
       ...(opts.suggest ? inlineSuggestion(opts.suggest) : []),
       ...(opts.historyList ? historyPopover(opts.historyList) : []),
-      placeholder(opts.placeholderText ?? "Run a command"),
+      placeholderComp.of(placeholder(opts.placeholderText ?? "Run a command")),
       ...(opts.onChange
         ? [
             EditorView.updateListener.of((u) => {
@@ -470,6 +480,10 @@ export function createShellEditor(opts: ShellEditorOptions): ShellEditorHandle {
           EditorView.editable.of(editable),
           EditorState.readOnly.of(!editable),
         ]),
+      }),
+    setPlaceholder: (text) =>
+      view.dispatch({
+        effects: placeholderComp.reconfigure(placeholder(text)),
       }),
     retheme: (fontFamily, fontSize, fontWeight) =>
       view.dispatch({

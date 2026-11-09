@@ -10,7 +10,7 @@ import {
 import { t } from "@/i18n/zh";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import type { GitStatusSnapshot } from "@/modules/ai/lib/native";
+import type { GitStatusSnapshot } from "@/modules/git";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useGlobalShortcuts } from "@/modules/shortcuts";
 import type { TerminalPathDropTarget } from "@/modules/terminal";

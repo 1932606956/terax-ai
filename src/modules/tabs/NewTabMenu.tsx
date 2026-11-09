@@ -11,9 +11,9 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { t } from "@/i18n/zh";
-import { fmtShortcut, MOD_KEY, SHIFT_KEY } from "@/lib/platform";
 import { AgentLauncherPanel } from "@/modules/agents/components/AgentLauncherPanel";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
+import { useShortcutHint } from "@/modules/shortcuts";
 import {
   AiBrowserIcon,
   ArrowRight01Icon,
@@ -46,6 +46,11 @@ export function NewTabMenu({
   onNewGitGraph,
   onLaunchAgents,
 }: Props) {
+  const terminalHint = useShortcutHint("tab.new");
+  const blockHint = useShortcutHint("tab.newBlock");
+  const privateHint = useShortcutHint("tab.newPrivate");
+  const editorHint = useShortcutHint("tab.newEditor");
+  const previewHint = useShortcutHint("tab.newPreview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const openLauncherAfterMenuClose = useRef(false);
@@ -102,7 +107,7 @@ export function NewTabMenu({
                 />
                 <span className="flex-1">{t("tabs.terminal")}</span>
                 <span className="text-xs text-muted-foreground">
-                  {fmtShortcut(MOD_KEY, "T")}
+                  {terminalHint}
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onNewBlock}>
@@ -113,7 +118,7 @@ export function NewTabMenu({
                 />
                 <span className="flex-1">{t("tabs.blocks")}</span>
                 <span className="text-xs text-muted-foreground">
-                  {fmtShortcut(MOD_KEY, SHIFT_KEY, "T")}
+                  {blockHint}
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={openLauncher}>
@@ -138,7 +143,7 @@ export function NewTabMenu({
                 />
                 <span className="flex-1">{t("tabs.privacy")}</span>
                 <span className="text-xs text-muted-foreground">
-                  {fmtShortcut(MOD_KEY, "R")}
+                  {privateHint}
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onNewEditor}>
@@ -149,7 +154,7 @@ export function NewTabMenu({
                 />
                 <span className="flex-1">{t("tabs.editor")}</span>
                 <span className="text-xs text-muted-foreground">
-                  {fmtShortcut(MOD_KEY, "E")}
+                  {editorHint}
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onNewPreview}>
@@ -160,7 +165,7 @@ export function NewTabMenu({
                 />
                 <span className="flex-1">{t("tabs.preview")}</span>
                 <span className="text-xs text-muted-foreground">
-                  {fmtShortcut(MOD_KEY, "P")}
+                  {previewHint}
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onNewGitGraph}>

@@ -1,10 +1,10 @@
 import {
-  native,
+  git,
   type GitChangedFile,
   type GitDiscardEntry,
   type GitRepoInfo,
   type GitStatusSnapshot,
-} from "@/modules/ai/lib/native";
+} from "@/modules/git";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { t } from "@/i18n/zh";
 import {
@@ -705,7 +705,7 @@ export function useSourceControlPanel(
       await runMutation(
         `stage:${entry.path}`,
         (s) => optimisticStage(s, paths),
-        () => native.gitStage(repo.repoRoot, [entry.path]),
+        () => git.stage(repo.repoRoot, [entry.path]),
         [entry.path],
       );
     },
@@ -719,7 +719,7 @@ export function useSourceControlPanel(
       await runMutation(
         `unstage:${entry.path}`,
         (s) => optimisticUnstage(s, paths),
-        () => native.gitUnstage(repo.repoRoot, [entry.path]),
+        () => git.unstage(repo.repoRoot, [entry.path]),
         [entry.path],
       );
     },
@@ -760,7 +760,7 @@ export function useSourceControlPanel(
         ? `discard:${list[0].path}`
         : "discard:all",
       (s) => optimisticDiscard(s, paths),
-      () => native.gitDiscard(repo.repoRoot, entries),
+      () => git.discard(repo.repoRoot, entries),
       [...paths],
     );
   }, [pendingDiscard, repo, runMutation]);
@@ -771,7 +771,7 @@ export function useSourceControlPanel(
     await runMutation(
       "stage:all",
       (s) => optimisticStage(s, paths),
-      () => native.gitStage(repo.repoRoot, [...paths]),
+      () => git.stage(repo.repoRoot, [...paths]),
       [...paths],
     );
   }, [repo, runMutation, unstagedEntries]);
@@ -782,7 +782,7 @@ export function useSourceControlPanel(
     await runMutation(
       "unstage:all",
       (s) => optimisticUnstage(s, paths),
-      () => native.gitUnstage(repo.repoRoot, [...paths]),
+      () => git.unstage(repo.repoRoot, [...paths]),
       [...paths],
     );
   }, [repo, runMutation, stagedEntries]);
@@ -816,14 +816,14 @@ export function useSourceControlPanel(
         await runMutation(
           `unstage:${entry.path}`,
           (s) => optimisticUnstage(s, paths),
-          () => native.gitUnstage(repo.repoRoot, [entry.path]),
+          () => git.unstage(repo.repoRoot, [entry.path]),
           [entry.path],
         );
       } else {
         await runMutation(
           `stage:${entry.path}`,
           (s) => optimisticStage(s, paths),
-          () => native.gitStage(repo.repoRoot, [entry.path]),
+          () => git.stage(repo.repoRoot, [entry.path]),
           [entry.path],
         );
       }
@@ -875,7 +875,7 @@ export function useSourceControlPanel(
         await Promise.all([
           import("@/modules/ai/lib/agent"),
           import("ai"),
-          native.gitDiff(repo.repoRoot, null, true),
+          git.diff(repo.repoRoot, null, true),
         ]);
       const { text: diffText, truncated } = truncateDiff(diff.diffText);
       const chatState = useChatStore.getState();
@@ -937,7 +937,7 @@ export function useSourceControlPanel(
     setActionMessage(null);
     setActionError(null);
     try {
-      const result = await native.gitCommit(repo.repoRoot, commitMessage);
+      const result = await git.commit(repo.repoRoot, commitMessage);
       setCommitMessage("");
       setActionMessage(
         t(
