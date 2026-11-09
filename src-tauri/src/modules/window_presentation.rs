@@ -55,6 +55,69 @@ pub fn window_presentation_state(
     *state.0.lock().unwrap_or_else(|error| error.into_inner())
 }
 
+/// Installs the webview's selective context-menu filter once at startup.
+/// "到处都有" 原生菜单是 WebView2 默认行为：对任何非可编辑命中直接
+/// Handled=true 压掉，只把带选择的文本和可编辑区留给原生菜单（终端复制，
+/// 编辑器输入框），其余交由 Terax 自己的右键菜单。
+/// WebView2-only (Windows)；其他平台是 no-op。
+#[tauri::command]
+pub fn webview_install_context_menu(window: tauri::WebviewWindow) -> Result<(), String> {
+    install_context_menu(&window)
+}
+
+#[cfg(windows)]
+fn install_context_menu(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use webview2_com::ContextMenuRequestedEventHandler;
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2ContextMenuRequestedEventArgs, ICoreWebView2_11,
+    };
+    use windows::core::{Interface, BOOL};
+
+    window
+        .with_webview(move |platform| {
+            let controller = platform.controller();
+            let result = unsafe {
+                controller.CoreWebView2().and_then(|core| {
+                    let webview: ICoreWebView2_11 = core.cast()?;
+                    let mut token = 0i64;
+                    webview.add_ContextMenuRequested(
+                        &ContextMenuRequestedEventHandler::create(Box::new(
+                            move |_sender, args: Option<ICoreWebView2ContextMenuRequestedEventArgs>| {
+                                if let Some(args) = args {
+                                    let suppress = args
+                                        .ContextMenuTarget()
+                                        .and_then(|target| {
+                                            let mut editable = BOOL::from(false);
+                                            let mut selected = BOOL::from(false);
+                                            target.IsEditable(&mut editable)?;
+                                            target.HasSelection(&mut selected)?;
+                                            Ok((editable.as_bool(), selected.as_bool()))
+                                        })
+                                        .map(|(editable, selected)| !editable && !selected)
+                                        .unwrap_or(true);
+                                    if suppress {
+                                        let _ = args.SetHandled(true);
+                                    }
+                                }
+                                Ok(())
+                            },
+                        )),
+                        &mut token,
+                    )
+                })
+            };
+            if let Err(error) = result {
+                log::warn!("add_ContextMenuRequested failed: {error}");
+            }
+        })
+        .map_err(|error| format!("with_webview: {error}"))
+}
+
+#[cfg(not(windows))]
+fn install_context_menu(_window: &tauri::WebviewWindow) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 pub mod macos {
     use super::{Change, WindowPresentationState};

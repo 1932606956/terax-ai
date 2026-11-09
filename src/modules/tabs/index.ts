@@ -18,6 +18,7 @@ export {
   useTabs,
 } from "./lib/useTabs";
 export { useWindowTitle } from "./lib/useWindowTitle";
+export { resolveNewTabCwd } from "./lib/resolveNewTabCwd";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
 export { TabBar, TabIcon } from "./TabBar";
 export { TabSwitcherHud } from "./TabSwitcherHud";

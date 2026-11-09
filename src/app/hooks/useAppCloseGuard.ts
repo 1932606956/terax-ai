@@ -90,10 +90,10 @@ export function useAppCloseGuard(tabsRef: RefObject<Tab[]>) {
           id: "close-save-failed",
           duration: Number.POSITIVE_INFINITY,
           description: flush.timedOut
-            ? "Saving is taking too long. The latest messages may be lost."
-            : "The latest messages may be lost.",
+            ? t("close.saveTooLong")
+            : t("close.messagesLost"),
           action: {
-            label: "Close anyway",
+            label: t("close.anyway"),
             onClick: () => {
               clearTimeout(forceExitTimer.current);
               void closeWindow();

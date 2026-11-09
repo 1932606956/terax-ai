@@ -1,4 +1,6 @@
 import { t } from "@/i18n/zh";
+import { currentWorkspaceEnv } from "@/modules/workspace";
+import { invoke } from "@tauri-apps/api/core";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 
@@ -33,5 +35,17 @@ export async function openWithExternal(
   } catch (e) {
     console.error("openPath failed:", e);
     toast.error(t("ctx.openExternalFailed"));
+  }
+}
+
+export async function openInWindowsTerminal(cwd: string): Promise<void> {
+  try {
+    await invoke("shell_open_windows_terminal", {
+      cwd,
+      workspace: currentWorkspaceEnv(),
+    });
+  } catch (e) {
+    console.error("shell_open_windows_terminal failed:", e);
+    toast.error(t("toast.windowsTerminalUnavailable"));
   }
 }

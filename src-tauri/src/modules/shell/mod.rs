@@ -288,6 +288,65 @@ pub fn shell_bg_list(state: tauri::State<ShellState>) -> Result<Vec<BackgroundPr
     Ok(out)
 }
 
+#[allow(dead_code)]
+pub(crate) const WT_UNAVAILABLE: &str = "Windows Terminal is only available on Windows";
+#[allow(dead_code)]
+pub(crate) const WT_NOT_FOUND: &str = "找不到 Windows Terminal (wt.exe)";
+
+/// `wt.exe -d <cwd>`. `program` is an absolute path from `which`, never a shell string.
+pub(crate) fn windows_terminal_command(
+    program: &std::path::Path,
+    cwd: &std::path::Path,
+) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.arg("-d").arg(cwd);
+    cmd
+}
+
+#[cfg(windows)]
+fn resolve_wt_exe() -> Result<PathBuf, String> {
+    which::which("wt.exe")
+        .or_else(|_| which::which("wt"))
+        .map_err(|_| WT_NOT_FOUND.to_string())
+}
+
+/// Opens the authorized directory in Windows Terminal. Does not start a shell
+/// inside Terax; `wt` is spawned detached.
+#[tauri::command]
+pub async fn shell_open_windows_terminal(
+    app: tauri::AppHandle,
+    cwd: String,
+    workspace: Option<WorkspaceEnv>,
+) -> Result<(), String> {
+    #[cfg(not(windows))]
+    {
+        let _ = (app, cwd, workspace);
+        return Err(WT_UNAVAILABLE.to_string());
+    }
+    #[cfg(windows)]
+    {
+        let workspace = workspace.unwrap_or(WorkspaceEnv::Local);
+        if matches!(workspace, WorkspaceEnv::Wsl { .. }) {
+            return Err("Windows Terminal open is only supported for local directories".into());
+        }
+        let program = resolve_wt_exe()?;
+        let canonical = tauri::async_runtime::spawn_blocking(move || {
+            authorize_spawn_cwd(&app.state::<WorkspaceRegistry>(), Some(&cwd), &workspace)
+        })
+        .await
+        .map_err(|e| e.to_string())??
+        .ok_or_else(|| "cwd is required".to_string())?;
+        let mut cmd = windows_terminal_command(&program, &canonical);
+        crate::modules::proc::hide_console(&mut cmd);
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| format!("failed to start Windows Terminal: {e}"))?;
+        Ok(())
+    }
+}
+
 pub(crate) fn build_oneshot_command(
     command: &str,
     #[cfg_attr(not(windows), allow(unused_variables))] workspace: &WorkspaceEnv,
@@ -389,5 +448,32 @@ mod tests {
         assert_eq!(cmd.get_program(), "/bin/sh");
         let args: Vec<_> = cmd.get_args().collect();
         assert_eq!(args, vec!["-c", "echo hi"]);
+    }
+}
+
+#[cfg(test)]
+mod windows_terminal_tests {
+    use super::{windows_terminal_command, WT_NOT_FOUND, WT_UNAVAILABLE};
+    use std::ffi::OsStr;
+    use std::path::Path;
+
+    #[test]
+    fn windows_terminal_command_passes_cwd_as_arg() {
+        let cmd = windows_terminal_command(
+            Path::new(r"C:\Program Files\WindowsApps\wt.exe"),
+            Path::new(r"D:\work\repo"),
+        );
+        assert_eq!(
+            cmd.get_program(),
+            OsStr::new(r"C:\Program Files\WindowsApps\wt.exe")
+        );
+        let args: Vec<_> = cmd.get_args().collect();
+        assert_eq!(args, vec![OsStr::new("-d"), OsStr::new(r"D:\work\repo")]);
+    }
+
+    #[test]
+    fn windows_terminal_errors_are_stable() {
+        assert!(WT_UNAVAILABLE.contains("Windows"));
+        assert!(WT_NOT_FOUND.contains("wt.exe"));
     }
 }

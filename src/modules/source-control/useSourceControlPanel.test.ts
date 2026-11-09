@@ -16,6 +16,8 @@ function entry(path: string): SourceControlFileEntry {
     staged: false,
     unstaged: true,
     untracked: false,
+    insertions: 0,
+    deletions: 0,
   };
 }
 

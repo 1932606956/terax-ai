@@ -9,6 +9,7 @@ import {
   EditorPane,
   type EditorPaneHandle,
 } from "@/modules/editor/EditorPane";
+import { GitDiffPane } from "@/modules/editor/GitDiffPane";
 import {
   listenFsChanged,
   parentDir,
@@ -50,8 +51,10 @@ export const PeekEditor = forwardRef<EditorPaneHandle, Props>(
       [setDirty, tab.id],
     );
 
-    // fs-watch reload for this file, mirroring useEditorFileSync.
+    // fs-watch reload for this file, mirroring useEditorFileSync. Diff tabs
+    // render a snapshot of a git revision, so a disk change cannot affect them.
     useEffect(() => {
+      if (tab.diff) return;
       const dir = parentDir(path);
       watchAdd([dir], [path]);
       let alive = true;
@@ -73,11 +76,12 @@ export const PeekEditor = forwardRef<EditorPaneHandle, Props>(
         unlisten?.();
         watchRemove([dir], [path]);
       };
-    }, [path]);
+    }, [path, tab.diff]);
 
     // Reload on external writes (other windows/tools); "editor" source is
     // already handled in-memory by useDocument.
     useEffect(() => {
+      if (tab.diff) return;
       let alive = true;
       let unlisten: (() => void) | undefined;
       const normalized = path.replace(/\\/g, "/");
@@ -99,7 +103,7 @@ export const PeekEditor = forwardRef<EditorPaneHandle, Props>(
         alive = false;
         unlisten?.();
       };
-    }, [path]);
+    }, [path, tab.diff]);
 
     const requestClose = useCallback(() => {
       onConfirmClose(tab.id);
@@ -130,13 +134,17 @@ export const PeekEditor = forwardRef<EditorPaneHandle, Props>(
         className={visible ? "h-full w-full" : "hidden"}
         aria-hidden={!visible}
       >
-        <EditorPane
-          ref={combinedRef}
-          path={path}
-          onDirtyChange={handleDirty}
-          onClose={requestClose}
-          mediaActive={visible}
-        />
+        {tab.diff ? (
+          <GitDiffPane source={tab.diff} active={visible} />
+        ) : (
+          <EditorPane
+            ref={combinedRef}
+            path={path}
+            onDirtyChange={handleDirty}
+            onClose={requestClose}
+            mediaActive={visible}
+          />
+        )}
       </div>
     );
   },

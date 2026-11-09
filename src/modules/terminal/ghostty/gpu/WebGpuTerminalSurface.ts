@@ -199,6 +199,8 @@ export class WebGpuTerminalSurface
   private drawCells = 0;
   /** What the uniform last held, kept to repack it when only the pane's rectangle moves. */
   private lastScreenState: ScreenUniformState | null = null;
+  /** Last transform written to the hidden input; skips redundant style writes. */
+  private imeAnchorTransform = "";
 
   private constructor(
     private readonly runtime: WebGpuTerminalRuntime,
@@ -242,7 +244,8 @@ export class WebGpuTerminalSurface
     this.input.setAttribute("autocomplete", "off");
     this.input.setAttribute("spellcheck", "false");
     this.input.style.cssText =
-      "position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;resize:none;pointer-events:none;";
+      "position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;resize:none;pointer-events:none;transform-origin:0 0;";
+    this.input.setAttribute("data-terax-ime-anchor", "");
     this.scrollbar.setAttribute("aria-label", "Terminal scrollback");
     this.scrollbar.setAttribute("role", "scrollbar");
     this.scrollbar.style.cssText =
@@ -1317,6 +1320,29 @@ export class WebGpuTerminalSurface
 
   private boundAtlasGeneration = 0;
 
+  /**
+   * Moves the hidden input to the terminal cursor so the platform IME candidate
+   * window opens next to what the user is typing. A fixed 1x1 field at the origin
+   * pinned the candidates to the pane's top-left corner on Windows regardless of
+   * where the cursor sat. The field keeps its 1x1 size and zero opacity; only its
+   * position changes, in CSS pixels of the pane.
+   */
+  private placeImeAnchor(
+    cursor: ReturnType<GhosttyTerminalModelApi["cursor"]>,
+    shiftY: number,
+  ): void {
+    const show =
+      this.cursorEnabled && this.nativeCursorVisible && cursor.visible !== false;
+    const x = show ? cursor.x * this.metrics.cellWidth : 0;
+    const y = show
+      ? cursor.y * this.metrics.cellHeight - shiftY / this.metrics.scale
+      : 0;
+    const transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    if (transform === this.imeAnchorTransform) return;
+    this.imeAnchorTransform = transform;
+    this.input.style.transform = transform;
+  }
+
   private updateScreenUniform(
     frame: GhosttyGpuFrame,
     cursor: ReturnType<GhosttyTerminalModelApi["cursor"]>,
@@ -1373,6 +1399,7 @@ export class WebGpuTerminalSurface
       contrast: this.contrast,
     };
     const shiftY = this.gridShift(state, cursor);
+    this.placeImeAnchor(cursor, shiftY);
     if (__TERAX_BENCH__ && this.nativeCursorVisible) {
       // The cursor the application asked for, whatever phase its blink is in.
       const rect = cursorRect(cursor, cursor.style, this.metrics);

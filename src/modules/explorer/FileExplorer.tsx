@@ -8,7 +8,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { t } from "@/i18n/zh";
-import { IS_MAC } from "@/lib/platform";
+import { IS_MAC, IS_WINDOWS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import type { GitStatusSnapshot } from "@/modules/git";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -46,6 +46,7 @@ import {
 } from "./lib/clipboardPaste";
 import {
   copyToClipboard,
+  openInWindowsTerminal,
   openWithExternal,
   relativePath,
   revealInFinder,
@@ -899,11 +900,17 @@ export const FileExplorer = memo(
                   {!menuTarget.isDir && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
-                      onSelect={() => onOpenFile(menuTarget.path, true)}
+                      onSelect={() => onOpenFile(menuTarget.path)}
                     >
                       {t("ctx.open")}
                     </ContextMenuItem>
                   )}
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => tree.beginRename(menuTarget.path)}
+                  >
+                    {t("ctx.rename")}
+                  </ContextMenuItem>
                   {!menuTarget.isDir && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
@@ -926,6 +933,14 @@ export const FileExplorer = memo(
                       onSelect={() => onRevealInTerminal(menuTarget.path)}
                     >
                       {t("ctx.openInTerminal")}
+                    </ContextMenuItem>
+                  )}
+                  {menuTarget.isDir && IS_WINDOWS && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => void openInWindowsTerminal(menuTarget.path)}
+                    >
+                      {t("ctx.openInWindowsTerminal")}
                     </ContextMenuItem>
                   )}
                   {menuTarget.isDir && onOpenInSourceControl && (
@@ -1040,6 +1055,14 @@ export const FileExplorer = memo(
                       onSelect={() => onRevealInTerminal(rootPath)}
                     >
                       {t("ctx.openInTerminal")}
+                    </ContextMenuItem>
+                  )}
+                  {IS_WINDOWS && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => void openInWindowsTerminal(rootPath)}
+                    >
+                      {t("ctx.openInWindowsTerminal")}
                     </ContextMenuItem>
                   )}
                   {onOpenInSourceControl && (

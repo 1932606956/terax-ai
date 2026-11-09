@@ -1,15 +1,46 @@
 import { create } from "zustand";
 
+/** Which diff side a peek diff tab compares. Mirrors the git panel's mode. */
+export type PeekDiffSource =
+  | {
+      kind: "working";
+      repoRoot: string;
+      path: string;
+      mode: "-" | "+";
+      originalPath: string | null;
+    }
+  | {
+      kind: "commit";
+      repoRoot: string;
+      sha: string;
+      path: string;
+      originalPath: string | null;
+    };
+
 export type PeekTab = {
   id: string;
   path: string;
   dirty: boolean;
+  /**
+   * Diff tabs show the change against a git revision instead of the file's
+   * current contents; their editor is read-only. Absent for file tabs.
+   */
+  diff?: PeekDiffSource;
 };
 
 let nextSeq = 1;
 
 function allocId(): string {
   return `peek-${nextSeq++}`;
+}
+
+/** Two diffs of the same path differ per repo/side/revision; file tabs key on path. */
+function tabKey(path: string, diff?: PeekDiffSource): string {
+  if (!diff) return path;
+  if (diff.kind === "working") {
+    return `${diff.repoRoot}\u0000${diff.path}\u0000working\u0000${diff.mode}\u0000${diff.originalPath ?? ""}`;
+  }
+  return `${diff.repoRoot}\u0000${diff.path}\u0000commit\u0000${diff.sha}\u0000${diff.originalPath ?? ""}`;
 }
 
 function nextActive(tabs: PeekTab[], closingId: string): string | null {
@@ -25,6 +56,8 @@ type PeekState = {
   activeSpaceId: string | null;
   /** Same path: idempotent activate. New path: append and activate. */
   open: (path: string, spaceId: string | null) => void;
+  /** Opens (or re-activates) a diff view for a git-noted change. */
+  openDiff: (diff: PeekDiffSource, spaceId: string | null) => void;
   /** Returns false when the tab is dirty and the caller must confirm first. */
   close: (id: string) => boolean;
   /** Removes regardless of dirty state (used after user confirmation). */
@@ -33,6 +66,8 @@ type PeekState = {
   closeAll: () => boolean;
   /** Removes every tab regardless of dirty state. */
   clear: () => void;
+  /** Returns false when any OTHER tab is dirty and the caller must confirm first. */
+  closeOthers: (id: string) => boolean;
   setDirty: (id: string, dirty: boolean) => void;
   setActive: (id: string) => void;
   /** Mirror an explorer rename into the peek tab's path. */
@@ -52,6 +87,25 @@ export const usePeekStore = create<PeekState>((set) => ({
         return { activeId: existing.id, activeSpaceId: spaceId };
       }
       const tab: PeekTab = { id: allocId(), path, dirty: false };
+      return {
+        tabs: [...s.tabs, tab],
+        activeId: tab.id,
+        activeSpaceId: spaceId,
+      };
+    }),
+  openDiff: (diff, spaceId) =>
+    set((s) => {
+      const wanted = tabKey(diff.path, diff);
+      const existing = s.tabs.find((t) => tabKey(t.path, t.diff) === wanted);
+      if (existing) {
+        return { activeId: existing.id, activeSpaceId: spaceId };
+      }
+      const tab: PeekTab = {
+        id: allocId(),
+        path: diff.path,
+        dirty: false,
+        diff,
+      };
       return {
         tabs: [...s.tabs, tab],
         activeId: tab.id,
@@ -82,6 +136,19 @@ export const usePeekStore = create<PeekState>((set) => ({
         activeId: s.activeId === id ? nextActive(s.tabs, id) : s.activeId,
       };
     }),
+  closeOthers: (id) => {
+    let blocked = false;
+    set((s) => {
+      const kept = s.tabs.find((t) => t.id === id);
+      if (!kept) return s;
+      if (s.tabs.some((t) => t.id !== id && t.dirty)) {
+        blocked = true;
+        return s;
+      }
+      return { tabs: [kept], activeId: id };
+    });
+    return !blocked;
+  },
   closeAll: () => {
     let blocked = false;
     set((s) => {

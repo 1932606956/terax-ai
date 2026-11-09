@@ -1,3 +1,4 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Alert02Icon,
   Cancel01Icon,
@@ -6,7 +7,6 @@ import {
   LinkSquare02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   forwardRef,
   useEffect,
@@ -57,6 +57,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
       return () => clearTimeout(t);
     }, [visible]);
 
+    // Selective suppression lives at the WebView2 level (see
+    // webview_install_context_menu, called once from main.tsx): the iframe is
+    // cross-origin so its contextmenu events never reach this page.
     useImperativeHandle(
       ref,
       () => ({

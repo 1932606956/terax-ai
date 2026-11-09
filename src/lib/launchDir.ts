@@ -2,15 +2,31 @@ import { invoke } from "@tauri-apps/api/core";
 
 let cached: string | undefined;
 
+// CLI-passed dir only (Explorer "Open in Terax", `terax <dir>`): stays
+// undefined on normal launches, unlike `cached` which falls back to the
+// process cwd. The spaces-restore branch keys its launch tab off this, so
+// a fallback value must never leak in here.
+let cachedCli: string | undefined;
+
 export async function initLaunchDir(): Promise<void> {
+  const cli =
+    (await invoke<string | null>("get_launch_dir").catch(() => null)) ?? null;
+  cachedCli = cli ? cli.replace(/\\/g, "/") : undefined;
   const dir =
-    (await invoke<string | null>("get_launch_dir").catch(() => null)) ??
-    (await invoke<string>("workspace_current_dir").catch(() => null));
+    cli ?? (await invoke<string>("workspace_current_dir").catch(() => null));
   cached = dir ? dir.replace(/\\/g, "/") : undefined;
 }
 
 export function getLaunchDir(): string | undefined {
   return cached;
+}
+
+/**
+ * CLI-passed dir only; undefined on normal launches (no args).
+ * Seeded by initLaunchDir before first paint, same as getLaunchDir.
+ */
+export function getCliLaunchDir(): string | undefined {
+  return cachedCli;
 }
 
 /**

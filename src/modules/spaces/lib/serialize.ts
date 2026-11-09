@@ -69,6 +69,47 @@ export function isSerializableTab(tab: Tab): boolean {
   }
 }
 
+/**
+ * Save-path predicate: only locked terminal tabs survive a restart.
+ * Locking is a terminal-only concept, so editors, previews, markdown and
+ * unlocked terminals are all dropped by the save path. Private terminals
+ * stay excluded even when locked.
+ */
+export function isPersistedTab(tab: Tab): boolean {
+  return tab.kind === "terminal" && tab.locked === true && !tab.private;
+}
+
+/**
+ * Index of the active tab within the persisted (locked-only) order, or -1
+ * when the active tab itself is not persisted. Callers keep the stored index
+ * on -1 so an active unlocked tab never corrupts the saved pointer.
+ */
+export function persistedActiveIndex(tabs: Tab[], activeId: number): number {
+  return tabs.filter(isPersistedTab).findIndex((t) => t.id === activeId);
+}
+
+/**
+ * Per-space saved state under the locked-only policy: the serialized locked
+ * tabs plus an active pointer remapped into the surviving order. A stored
+ * pointer that aimed at a dropped tab clamps into range, and an empty space
+ * saves index 0 so restore starts from a valid state. Pass null activeId for
+ * spaces that are not active to keep their stored pointer.
+ */
+export function persistedSpaceState(
+  tabs: Tab[],
+  activeId: number | null,
+  storedIndex: number,
+): { tabs: SerializedTab[]; activeTabIndex: number } {
+  const serialized = serializeTabs(tabs);
+  const idx = activeId === null ? -1 : persistedActiveIndex(tabs, activeId);
+  const next = idx >= 0 ? idx : storedIndex;
+  const activeTabIndex =
+    serialized.length === 0
+      ? 0
+      : Math.min(Math.max(next, 0), serialized.length - 1);
+  return { tabs: serialized, activeTabIndex };
+}
+
 function serializeTab(tab: Tab): SerializedTab | null {
   if (!isSerializableTab(tab)) return null;
   switch (tab.kind) {
@@ -95,6 +136,9 @@ function serializeTab(tab: Tab): SerializedTab | null {
 export function serializeTabs(tabs: Tab[]): SerializedTab[] {
   const out: SerializedTab[] = [];
   for (const tab of tabs) {
+    // Save path: only locked tabs survive a restart. Unlocked tabs leave
+    // no trace in the persisted state.
+    if (!isPersistedTab(tab)) continue;
     const s = serializeTab(tab);
     if (s) out.push(s);
   }

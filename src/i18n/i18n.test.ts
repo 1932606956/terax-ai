@@ -16,4 +16,18 @@ describe("i18n dictionary", () => {
       expect(value.length).toBeGreaterThan(0);
     }
   });
+
+  it("substitutes close-dialog counts", () => {
+    expect(t("close.nFiles", "3")).toBe("3 个文件有未保存的更改");
+    expect(t("close.quitBusy")).toBe(
+      "终端中仍有进程在运行。退出将终止该进程。",
+    );
+    expect(
+      t("close.dirtyAndBusy", { n: "2", m: "4" }),
+    ).toContain("2 个标签页");
+    expect(t("close.dirtyAndBusy", { n: "2", m: "4" })).toContain(
+      "4 个进程",
+    );
+    expect(t("close.oneDirtyAndBusy", { m: "3" })).not.toContain("{m}");
+  });
 });

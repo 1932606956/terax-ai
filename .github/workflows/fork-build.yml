@@ -6,6 +6,10 @@ name: Fork Build (Windows)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - fix/default-model-and-compat-context
 
 jobs:
   build-windows:

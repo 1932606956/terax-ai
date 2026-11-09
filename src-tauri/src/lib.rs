@@ -240,6 +240,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         // One async scheme multiplexes every terminal's output; see pty/hub.rs.
         .register_asynchronous_uri_scheme_protocol("terax-pty", pty::stream_protocol)
         .register_asynchronous_uri_scheme_protocol("asset", fs::assets::serve)
@@ -409,6 +410,7 @@ pub fn run() {
             shell::shell_bg_logs,
             shell::shell_bg_kill,
             shell::shell_bg_list,
+            shell::shell_open_windows_terminal,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,
             workspace::ipc::wsl_home,
@@ -446,6 +448,7 @@ pub fn run() {
             vibrancy::window_backdrop_kind,
             vibrancy::window_set_backdrop,
             modules::window_presentation::window_presentation_state,
+            modules::window_presentation::webview_install_context_menu,
             #[cfg(feature = "bench")]
             modules::bench::bench_config,
             #[cfg(feature = "bench")]

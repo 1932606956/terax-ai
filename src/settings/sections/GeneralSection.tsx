@@ -2,7 +2,9 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -88,7 +90,7 @@ const OPTION_AS_ALT_CHOICES = [
 ] as const;
 const SCROLL_SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4] as const;
 
-type ShellInfo = { name: string; path: string; integrated: boolean };
+type ShellInfo = { id: string; name: string; path: string; integrated: boolean };
 const SHELL_AUTO = "auto";
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
@@ -374,7 +376,7 @@ export function GeneralSection() {
         <SettingRow
           title={t("gen.shell")}
           description={
-            shells.find((s) => s.path === terminalShell)?.integrated === false
+            shells.find((s) => s.id === terminalShell)?.integrated === false
               ? t("gen.shellNoBlocks")
               : wslDistros.length > 0
                 ? t("gen.shellWsl")
@@ -397,11 +399,31 @@ export function GeneralSection() {
               <SelectItem value={SHELL_AUTO} className="text-[12px]">
                 Auto
               </SelectItem>
-              {shells.map((s) => (
-                <SelectItem key={s.path} value={s.path} className="text-[12px]">
-                  {s.name}
-                </SelectItem>
-              ))}
+              {shells.some((s) => !s.id.startsWith("wt:")) && (
+                <SelectGroup>
+                  {shells
+                    .filter((s) => !s.id.startsWith("wt:"))
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id} className="text-[12px]">
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                </SelectGroup>
+              )}
+              {shells.some((s) => s.id.startsWith("wt:")) && (
+                <SelectGroup>
+                  <SelectLabel className="text-[11px]">
+                    {t("gen.shellWindowsTerminal")}
+                  </SelectLabel>
+                  {shells
+                    .filter((s) => s.id.startsWith("wt:"))
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id} className="text-[12px]">
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                </SelectGroup>
+              )}
             </SelectContent>
           </Select>
         </SettingRow>

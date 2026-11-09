@@ -27,6 +27,10 @@ pub struct GitChangedFile {
     pub unstaged: bool,
     pub untracked: bool,
     pub status_label: String,
+    /// Lines added against HEAD. Zero for untracked files until they are staged.
+    pub insertions: u32,
+    /// Lines removed against HEAD.
+    pub deletions: u32,
 }
 
 #[derive(Serialize)]
@@ -189,6 +193,8 @@ mod serde_shape_tests {
             unstaged: false,
             untracked: false,
             status_label: "renamed".into(),
+            insertions: 12,
+            deletions: 3,
         };
         let json = serde_json::to_value(&file).unwrap();
         assert_eq!(
@@ -202,6 +208,8 @@ mod serde_shape_tests {
                 "unstaged": false,
                 "untracked": false,
                 "statusLabel": "renamed",
+                "insertions": 12,
+                "deletions": 3,
             })
         );
     }

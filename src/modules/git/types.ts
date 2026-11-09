@@ -14,6 +14,8 @@ export type GitChangedFile = {
   unstaged: boolean;
   untracked: boolean;
   statusLabel: string;
+  insertions: number;
+  deletions: number;
 };
 
 export type GitStatusSnapshot = {

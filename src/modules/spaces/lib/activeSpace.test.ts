@@ -1,6 +1,11 @@
 import type { WorkspaceEnv } from "@/modules/workspace";
 import { describe, expect, it } from "vitest";
-import { activeSpaceEnv, findActiveSpace, freshTabCwd } from "./activeSpace";
+import {
+  activeSpaceEnv,
+  findActiveSpace,
+  freshTabCwd,
+  launchCwdForRestore,
+} from "./activeSpace";
 import type { SpaceMeta } from "./store";
 
 function space(over: Partial<SpaceMeta>): SpaceMeta {
@@ -61,9 +66,17 @@ describe("freshTabCwd", () => {
   const wsl: WorkspaceEnv = { kind: "wsl", distro: "Ubuntu" };
   const local: WorkspaceEnv = { kind: "local" };
 
-  it("prefers the restored home for any env", () => {
+  it("prefers the restored home for a WSL env, ignoring the launch cwd", () => {
     expect(freshTabCwd(wsl, "/home/aj", "C:/Users/me", "C:/Users/me")).toBe(
       "/home/aj",
+    );
+  });
+
+  it("prefers an explicit launch cwd over the restored home for local", () => {
+    // Explorer "Open in Terax" / `terax <dir>`: the restored home is just
+    // where the previous session happened to be.
+    expect(freshTabCwd(local, "/home/aj", "D:/work", "C:/Users/me")).toBe(
+      "D:/work",
     );
   });
 
@@ -75,5 +88,26 @@ describe("freshTabCwd", () => {
     expect(freshTabCwd(local, null, "C:/work", "C:/Users/me")).toBe("C:/work");
     expect(freshTabCwd(local, null, null, "C:/Users/me")).toBe("C:/Users/me");
     expect(freshTabCwd(local, null, null, null)).toBeNull();
+  });
+});
+
+describe("launchCwdForRestore", () => {
+  const wsl: WorkspaceEnv = { kind: "wsl", distro: "Ubuntu" };
+  const local: WorkspaceEnv = { kind: "local" };
+
+  it("returns the CLI dir for a local space with restored tabs", () => {
+    expect(launchCwdForRestore(local, "D:/work", true)).toBe("D:/work");
+  });
+
+  it("returns null on normal launches without a CLI dir", () => {
+    expect(launchCwdForRestore(local, null, true)).toBeNull();
+  });
+
+  it("returns null for a WSL space, where Windows paths are meaningless", () => {
+    expect(launchCwdForRestore(wsl, "C:/Users/me", true)).toBeNull();
+  });
+
+  it("returns null for an empty active space, covered by the fresh-tab fallback", () => {
+    expect(launchCwdForRestore(local, "D:/work", false)).toBeNull();
   });
 });

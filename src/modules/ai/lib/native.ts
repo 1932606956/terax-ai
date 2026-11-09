@@ -44,6 +44,7 @@ export type GrepResponse = {
 type GlobHit = { path: string; rel: string };
 export type GlobResponse = { hits: GlobHit[]; truncated: boolean };
 
+
 export const native = {
   workspaceCurrentDir: () => invoke<string>("workspace_current_dir"),
   workspaceAuthorize: (path: string) =>

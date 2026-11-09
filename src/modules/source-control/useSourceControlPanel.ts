@@ -63,6 +63,8 @@ export type SourceControlFileEntry = {
   staged: boolean;
   unstaged: boolean;
   untracked: boolean;
+  insertions: number;
+  deletions: number;
 };
 
 export function stageRange(
@@ -331,6 +333,8 @@ function optimisticUnstage(
         unstaged: true,
         untracked: false,
         statusLabel: "Deleted",
+        insertions: 0,
+        deletions: file.deletions,
       });
       next.push({
         path: file.path,
@@ -341,6 +345,8 @@ function optimisticUnstage(
         unstaged: true,
         untracked: true,
         statusLabel: "Untracked",
+        insertions: 0,
+        deletions: 0,
       });
       continue;
     }
@@ -479,6 +485,8 @@ export function useSourceControlPanel(
         staged: file.staged,
         unstaged: file.unstaged,
         untracked: file.untracked,
+        insertions: file.insertions,
+        deletions: file.deletions,
       });
     }
     return orderFileEntries(out);

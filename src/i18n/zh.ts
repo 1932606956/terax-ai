@@ -238,6 +238,7 @@ const zh: Record<string, string> = {
   "gen.shellWsl":
     "集成终端使用的 Shell。WSL 空间使用发行版登录 Shell。已有标签页保持原 Shell。",
   "gen.shellDesc": "新终端标签页使用的 Shell。已有标签页保持原 Shell。",
+  "gen.shellWindowsTerminal": "Windows Terminal 配置",
   "gen.workspace": "工作区环境",
   "gen.workspaceDesc":
     "新空间（终端与 AI 助手均适用）的运行位置：Windows 或 WSL 发行版。已有空间保持不变，可随时从状态栏切换。",
@@ -245,7 +246,7 @@ const zh: Record<string, string> = {
   "gen.letterSpacingDesc":
     "字符间的额外水平间距（像素）。使用 Nerd Font 时可用负值收紧间距。",
   "gen.fontSize": "字号",
-  "gen.fontSizeDesc": "终端文字大小。",
+  "gen.fontSizeDesc": "终端文字大小，不受界面缩放影响。",
   "gen.scrollback": "回滚行数",
   "gen.scrollbackDesc":
     "每个终端保留的历史行数。越大占用内存越多（约 3 KB / 行）。",
@@ -438,6 +439,8 @@ const zh: Record<string, string> = {
   // explorer / shared context menu
   "ctx.open": "打开",
   "ctx.openInTerminal": "在终端中打开",
+  "ctx.openInWindowsTerminal": "在 Windows Terminal 中打开",
+  "toast.windowsTerminalUnavailable": "无法打开 Windows Terminal",
   "ctx.openInScm": "在源代码管理中打开",
   "ctx.openGitHistory": "打开 Git 历史",
   "ctx.reveal": "在文件管理器中显示",
@@ -448,6 +451,7 @@ const zh: Record<string, string> = {
   "ctx.copyRelPath": "复制相对路径",
   "ctx.attachToAgent": "附加到 Agent",
   "ctx.refresh": "刷新",
+  "ctx.rename": "重命名",
   "ctx.delete": "删除",
   "ctx.confirmDelete": "再次点击确认删除",
   "ctx.deleteNItems": "删除 {n} 项",
@@ -470,6 +474,7 @@ const zh: Record<string, string> = {
   "scm.fetching": "获取中...",
   "scm.pulling": "拉取中...",
   "scm.refresh": "刷新源代码管理",
+  "scm.revealRepo": "在文件管理器中打开仓库",
   "scm.nothingStaged": "未暂存任何更改",
   "scm.commit": "提交",
   "scm.committing": "提交中...",
@@ -703,15 +708,81 @@ const zh: Record<string, string> = {
 
   // peek card region (file tree clicks, own tab strip)
   "peek.closeAll": "全部关闭",
+  "peek.closeOthers": "关闭其他",
+  "peek.fullscreen": "全屏",
+  "peek.restore": "还原",
   "peek.dirtyTitle": "文件尚未保存",
   "peek.dirtyBody": "「{n}」有未保存的更改，仍然关闭吗？",
   "peek.dirtyBodyAll": "有未保存的更改，仍然全部关闭吗？",
   "peek.dirtyConfirm": "仍然关闭",
+
+  // close guards (dirty editors, running terminals, quit)
+  "close.cancel": "取消",
+  "close.anyway": "仍然关闭",
+  "close.quitAnyway": "仍然退出",
+  "close.checking": "正在检查…",
+  "close.saveTooLong": "保存耗时过长，最新消息可能丢失。",
+  "close.messagesLost": "最新消息可能丢失。",
+  "close.unsavedTitle": "未保存的更改",
+  "close.namedDirty": "「{n}」有未保存的更改，仍然关闭吗？",
+  "close.thisFileDirty": "此文件有未保存的更改，仍然关闭吗？",
+  "close.namedDeleted":
+    "「{n}」有未保存的更改。文件已被删除，仍然关闭吗？",
+  "close.thisFileDeleted":
+    "此文件有未保存的更改。文件已被删除，仍然关闭吗？",
+  "close.nFilesDeleted":
+    "{n} 个文件有未保存的更改。这些文件已被删除，仍然全部关闭吗？",
+  "close.terminalTitle": "关闭终端？",
+  "close.terminalBody":
+    "有进程正在运行。关闭此标签页将终止该进程。",
+  "close.dontAsk": "不再询问运行中的进程",
+  "close.rightTitle": "关闭右侧标签页",
+  "close.othersTitle": "关闭其他标签页",
+  "close.oneTabDirty":
+    "有 1 个标签页存在未保存的更改，仍然关闭吗？",
+  "close.quitTitle": "退出 Terax？",
+  "close.oneFile": "1 个文件有未保存的更改",
+  "close.nFiles": "{n} 个文件有未保存的更改",
+  "close.quitBoth":
+    "仍有进程在运行，且{n}。退出将终止该进程并丢弃这些更改。",
+  "close.quitDirty": "{n}。退出将丢弃这些更改。",
+  "close.quitBusy":
+    "终端中仍有进程在运行。退出将终止该进程。",
+  "close.dirtyAndBusy":
+    "{n} 个标签页有未保存的更改，且有 {m} 个进程正在运行。" +
+    "关闭将丢弃这些更改并终止这些进程，仍然关闭吗？",
+  "close.oneDirtyAndBusy":
+    "有 1 个标签页存在未保存的更改，且有 {m} 个进程正在运行。" +
+    "关闭将丢弃这些更改并终止这些进程，仍然关闭吗？",
+  "close.dirtyAndOneBusy":
+    "{n} 个标签页有未保存的更改，且有 1 个进程正在运行。" +
+    "关闭将丢弃这些更改并终止该进程，仍然关闭吗？",
+  "close.oneDirtyAndOneBusy":
+    "有 1 个标签页存在未保存的更改，且有 1 个进程正在运行。" +
+    "关闭将丢弃这些更改并终止该进程，仍然关闭吗？",
+  "close.nTabsDirty":
+    "{n} 个标签页有未保存的更改。关闭将丢弃这些更改，仍然关闭吗？",
+  "close.oneBusyRight":
+    "右侧有 1 个标签页的进程正在运行。关闭将终止该进程，仍然关闭吗？",
+  "close.nBusyRight":
+    "右侧有 {n} 个进程正在运行。关闭将终止这些进程，仍然关闭吗？",
+  "close.oneBusyOther":
+    "其他标签页中有 1 个进程正在运行。关闭将终止该进程，仍然关闭吗？",
+  "close.nBusyOther":
+    "其他标签页中有 {n} 个进程正在运行。关闭将终止这些进程，仍然关闭吗？",
 };
 
 export const dictionary: Readonly<Record<string, string>> = zh;
 
-export function t(key: string, arg?: string): string {
+export function t(
+  key: string,
+  arg?: string | { n?: string; m?: string },
+): string {
   const template = zh[key] ?? key;
-  return arg === undefined ? template : template.replace("{n}", arg);
+  if (arg === undefined) return template;
+  const n = typeof arg === "string" ? arg : arg.n;
+  const m = typeof arg === "string" ? undefined : arg.m;
+  return template
+    .replace("{n}", n ?? "{n}")
+    .replace("{m}", m ?? "{m}");
 }

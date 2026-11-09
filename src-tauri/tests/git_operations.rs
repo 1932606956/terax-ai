@@ -94,6 +94,66 @@ fn status_lists_untracked_file() {
 }
 
 #[test]
+fn status_reports_per_file_line_counts_against_head() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("tracked.ts", "one\ntwo\nthree\n");
+    fx.run_git(&["add", "tracked.ts"]);
+    fx.run_git(&["commit", "-qm", "init"]);
+    fx.write_file("tracked.ts", "one\nCHANGED\nthree\nfour\nfive\n");
+
+    let snap = operations::status(&fx.registry, &fx.repo_str(), &fx.workspace).expect("status");
+    let entry = snap
+        .changed_files
+        .iter()
+        .find(|f| f.path == "tracked.ts")
+        .expect("tracked.ts in changed_files");
+    assert_eq!((entry.insertions, entry.deletions), (3, 1));
+}
+
+#[test]
+fn status_leaves_untracked_files_without_line_counts() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("fresh.ts", "a\nb\n");
+
+    let snap = operations::status(&fx.registry, &fx.repo_str(), &fx.workspace).expect("status");
+    let entry = snap
+        .changed_files
+        .iter()
+        .find(|f| f.path == "fresh.ts")
+        .expect("fresh.ts in changed_files");
+    assert!(entry.untracked);
+    assert_eq!((entry.insertions, entry.deletions), (0, 0));
+}
+
+#[test]
+fn status_counts_staged_changes_too() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("s.ts", "a\n");
+    fx.run_git(&["add", "s.ts"]);
+    fx.run_git(&["commit", "-qm", "init"]);
+    fx.write_file("s.ts", "a\nb\nc\n");
+    fx.run_git(&["add", "s.ts"]);
+
+    let snap = operations::status(&fx.registry, &fx.repo_str(), &fx.workspace).expect("status");
+    let entry = snap
+        .changed_files
+        .iter()
+        .find(|f| f.path == "s.ts")
+        .expect("s.ts in changed_files");
+    assert!(entry.staged);
+    assert_eq!((entry.insertions, entry.deletions), (2, 0));
+}
+
+#[test]
 fn status_expands_small_untracked_directories_into_files() {
     if skip_if_no_git() {
         return;

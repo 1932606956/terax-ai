@@ -556,8 +556,10 @@ pub fn decode_command_output(bytes: &[u8]) -> String {
             0
         };
         let units: Vec<u16> = bytes[start..]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         String::from_utf16_lossy(&units)
     } else {
@@ -891,6 +893,32 @@ mod auth_tests {
         p.push(format!("terax-auth-{label}-{nanos}-{}", std::process::id()));
         fs::create_dir_all(&p).expect("create tempdir");
         fs::canonicalize(&p).expect("canonicalize tempdir")
+    }
+
+    // Directory symlinks need SeCreateSymbolicLinkPrivilege, which a normal
+    // user only gets with Developer Mode on. A junction is a real reparse
+    // point that canonicalize resolves the same way, so the escape check is
+    // exercised either way.
+    #[cfg(windows)]
+    fn windows_dir_link(target: &std::path::Path, link: &std::path::Path) {
+        match std::os::windows::fs::symlink_dir(target, link) {
+            Ok(()) => {}
+            Err(_) => {
+                let status = std::process::Command::new("cmd")
+                    .args(["/C", "mklink", "/J"])
+                    .arg(link)
+                    .arg(target)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .expect("run mklink");
+                assert!(status.success(), "neither symlink nor junction created");
+            }
+        }
+        assert!(
+            fs::canonicalize(link).expect("canonicalize link") == *target,
+            "link must resolve to the escape target"
+        );
     }
 
     #[test]
@@ -1236,7 +1264,7 @@ mod auth_tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&outside, &link).expect("symlink");
         #[cfg(windows)]
-        std::os::windows::fs::symlink_dir(&outside, &link).expect("symlink");
+        windows_dir_link(&outside, &link);
         let reg = WorkspaceRegistry::default();
         reg.authorize(&allowed).expect("authorize root");
         let s = link.to_string_lossy().into_owned();
@@ -1294,13 +1322,22 @@ mod appimage_tests {
         let env = reader(&[
             ("LD_LIBRARY_PATH", "/tmp/.mount_Terax_X/usr/lib:/usr/lib"),
             ("PATH", "/tmp/.mount_Terax_X/usr/bin:/usr/bin:/bin"),
-            ("GST_PLUGIN_SYSTEM_PATH", "/tmp/.mount_Terax_X/usr/lib/gstreamer-1.0"),
+            (
+                "GST_PLUGIN_SYSTEM_PATH",
+                "/tmp/.mount_Terax_X/usr/lib/gstreamer-1.0",
+            ),
             ("APPDIR", "/tmp/.mount_Terax_X"),
         ]);
         let out = compute_appimage_env_overrides(appdir, env);
 
-        assert_eq!(find(&out, "LD_LIBRARY_PATH"), Some(&Some(OsString::from("/usr/lib"))));
-        assert_eq!(find(&out, "PATH"), Some(&Some(OsString::from("/usr/bin:/bin"))));
+        assert_eq!(
+            find(&out, "LD_LIBRARY_PATH"),
+            Some(&Some(OsString::from("/usr/lib")))
+        );
+        assert_eq!(
+            find(&out, "PATH"),
+            Some(&Some(OsString::from("/usr/bin:/bin")))
+        );
         // Only an APPDIR entry, so the var is removed entirely.
         assert_eq!(find(&out, "GST_PLUGIN_SYSTEM_PATH"), Some(&None));
         assert_eq!(find(&out, "APPDIR"), Some(&None));
@@ -1324,9 +1361,16 @@ mod appimage_tests {
     fn unsets_value_vars_only_when_pointing_into_appdir() {
         let appdir = Path::new("/tmp/.mount_Terax_X");
         let into = reader(&[("LD_PRELOAD", "/tmp/.mount_Terax_X/usr/lib/x.so")]);
-        assert_eq!(find(&compute_appimage_env_overrides(appdir, into), "LD_PRELOAD"), Some(&None));
+        assert_eq!(
+            find(&compute_appimage_env_overrides(appdir, into), "LD_PRELOAD"),
+            Some(&None)
+        );
 
         let outside = reader(&[("FONTCONFIG_FILE", "/etc/fonts/fonts.conf")]);
-        assert!(find(&compute_appimage_env_overrides(appdir, outside), "FONTCONFIG_FILE").is_none());
+        assert!(find(
+            &compute_appimage_env_overrides(appdir, outside),
+            "FONTCONFIG_FILE"
+        )
+        .is_none());
     }
 }

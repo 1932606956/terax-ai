@@ -296,15 +296,18 @@ fn load_endpoint() -> Result<ControlDescriptor, CliError> {
             false,
         ),
         (None, None) => {
-            let path = dirs::cache_dir()
-                .map(|dir| dir.join("terax").join("control.json"))
-                .ok_or_else(|| {
-                    CliError::new(
-                        "app_unavailable",
-                        "could not locate the user cache directory",
-                        EXIT_UNAVAILABLE,
-                    )
-                })?;
+            let path = match env::var_os("TERAX_CONTROL_DIR") {
+                Some(dir) => PathBuf::from(dir).join("control.json"),
+                None => dirs::cache_dir()
+                    .map(|dir| dir.join("terax").join("control.json"))
+                    .ok_or_else(|| {
+                        CliError::new(
+                            "app_unavailable",
+                            "could not locate the user cache directory",
+                            EXIT_UNAVAILABLE,
+                        )
+                    })?,
+            };
             let bytes = std::fs::read(&path).map_err(|_| {
                 CliError::new(
                     "app_unavailable",
