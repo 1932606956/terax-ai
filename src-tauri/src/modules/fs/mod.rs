@@ -2,6 +2,7 @@ pub mod ai;
 pub mod assets;
 pub mod clipboard;
 pub mod copy;
+pub mod encoding;
 pub mod file;
 pub mod grep;
 pub mod index;

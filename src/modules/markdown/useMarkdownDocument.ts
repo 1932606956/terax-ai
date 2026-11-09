@@ -67,6 +67,7 @@ export function useMarkdownDocument(
       invoke<ReadResult>("fs_read_file", {
         path,
         workspace,
+        encoding: null,
       })
         .then((res) => {
           if (!alive || id !== requestId) return;

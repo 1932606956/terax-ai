@@ -39,6 +39,10 @@ export async function writeThemeFile(theme: Theme): Promise<string> {
     content: JSON.stringify(theme, null, 2),
     workspace: ws,
     source: "theme",
+    options: {
+      encoding: null,
+      bom: false,
+    },
   });
   return path;
 }

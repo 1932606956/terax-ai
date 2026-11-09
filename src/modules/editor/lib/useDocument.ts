@@ -8,7 +8,14 @@ import { toast } from "sonner";
 import { detectEol, type Eol, normalizeToLf, restoreEol } from "./eol";
 
 type ReadResult =
-  | { kind: "text"; content: string; size: number; mtime: number }
+  | {
+      kind: "text";
+      content: string;
+      size: number;
+      mtime: number;
+      encoding: string;
+      bom: boolean;
+    }
   | { kind: "binary"; size: number }
   | { kind: "toolarge"; size: number; limit: number };
 
@@ -19,7 +26,13 @@ export const FORCE_READ_LIMIT = 50 * 1024 * 1024;
 
 export type DocumentState =
   | { status: "loading" }
-  | { status: "ready"; content: string; size: number }
+  | {
+      status: "ready";
+      content: string;
+      size: number;
+      encoding: string;
+      bom: boolean;
+    }
   | { status: "binary"; size: number }
   | { status: "toolarge"; size: number; limit: number }
   | { status: "error"; message: string };
@@ -58,6 +71,9 @@ export function useDocument({ path, onDirtyChange }: Options) {
   }, []);
 
   const diskMtimeRef = useRef<number | null>(null);
+  const encodingRef = useRef("UTF-8");
+  const bomRef = useRef(false);
+  const autoEncodingRef = useRef(true);
 
   const writeToDisk = useCallback(async () => {
     const content = bufferRef.current;
@@ -66,6 +82,10 @@ export function useDocument({ path, onDirtyChange }: Options) {
       content: restoreEol(content, eolRef.current),
       workspace: currentWorkspaceEnv(),
       source: "editor",
+      options: {
+        encoding: encodingRef.current,
+        bom: bomRef.current,
+      },
     });
     diskMtimeRef.current = mtime;
     savedRef.current = content;
@@ -118,12 +138,20 @@ export function useDocument({ path, onDirtyChange }: Options) {
     if (res.kind === "text") {
       eolRef.current = detectEol(res.content);
       diskMtimeRef.current = res.mtime;
+      encodingRef.current = res.encoding;
+      bomRef.current = res.bom;
       const content = normalizeToLf(res.content);
       if (skipIfUnchanged && content === savedRef.current) return;
       savedRef.current = content;
       bufferRef.current = content;
       setDirty(false);
-      setDoc({ status: "ready", content, size: res.size });
+      setDoc({
+        status: "ready",
+        content,
+        size: res.size,
+        encoding: res.encoding,
+        bom: res.bom,
+      });
     } else if (res.kind === "binary") {
       setDoc({ status: "binary", size: res.size });
     } else if (res.kind === "toolarge") {
@@ -132,11 +160,12 @@ export function useDocument({ path, onDirtyChange }: Options) {
   }, []);
 
   const readFromDisk = useCallback(
-    (force: boolean) =>
+    (force: boolean, encoding: string | null) =>
       invoke<ReadResult>("fs_read_file", {
         path,
         workspace: currentWorkspaceEnv(),
         force,
+        encoding,
       }),
     [path],
   );
@@ -146,10 +175,11 @@ export function useDocument({ path, onDirtyChange }: Options) {
     let cancelled = false;
     // "Open anyway" is a per-file decision; a new path starts unforced.
     forceRef.current = false;
+    autoEncodingRef.current = true;
     setDoc({ status: "loading" });
     setDirty(false);
 
-    readFromDisk(forceRef.current)
+    readFromDisk(forceRef.current, null)
       .then((res) => {
         if (!cancelled) adoptRead(res);
       })
@@ -165,16 +195,31 @@ export function useDocument({ path, onDirtyChange }: Options) {
   const openAnyway = useCallback(() => {
     forceRef.current = true;
     setDoc({ status: "loading" });
-    readFromDisk(true)
+    readFromDisk(true, autoEncodingRef.current ? null : encodingRef.current)
       .then(adoptRead)
       .catch((e) => setDoc({ status: "error", message: String(e) }));
   }, [readFromDisk, adoptRead]);
+
+  const reopenWithEncoding = useCallback(
+    async (encoding: string | null): Promise<boolean> => {
+      if (dirtyRef.current) return false;
+      const res = await readFromDisk(forceRef.current, encoding);
+      if (res.kind !== "text") return false;
+      autoEncodingRef.current = encoding === null;
+      adoptRead(res);
+      return true;
+    },
+    [readFromDisk, adoptRead],
+  );
 
   // Skipped while dirty: never clobber unsaved edits. Re-checked when the
   // read resolves, since typing can start while it is in flight.
   const reload = useCallback((): boolean => {
     if (dirtyRef.current) return false;
-    void readFromDisk(forceRef.current)
+    void readFromDisk(
+      forceRef.current,
+      autoEncodingRef.current ? null : encodingRef.current,
+    )
       .then((res) => {
         if (!dirtyRef.current) adoptRead(res, true);
       })
@@ -196,9 +241,16 @@ export function useDocument({ path, onDirtyChange }: Options) {
   // would report it as an external conflict.
   // Returns the LF-normalized text the caller should dispatch.
   const adoptDiskText = useCallback(
-    (diskText: string, mtime: number): string => {
+    (
+      diskText: string,
+      mtime: number,
+      encoding?: string,
+      bom?: boolean,
+    ): string => {
       eolRef.current = detectEol(diskText);
       diskMtimeRef.current = mtime;
+      if (encoding) encodingRef.current = encoding;
+      if (bom !== undefined) bomRef.current = bom;
       const content = normalizeToLf(diskText);
       savedRef.current = content;
       setDirty(bufferRef.current !== content);
@@ -218,7 +270,12 @@ export function useDocument({ path, onDirtyChange }: Options) {
       const { autoSave: active, autoSaveDelay: delay } = autoSaveRef.current;
       if (active && isDirty) {
         timeoutRef.current = setTimeout(() => {
-          saveNow().catch((e) => console.error("[autosave]", e));
+          saveNow().catch((e) => {
+            console.error("[autosave]", e);
+            toast.error(t("editor.saveFailed"), {
+              description: String(e),
+            });
+          });
         }, delay);
       }
     },
@@ -227,5 +284,14 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
   useEffect(() => clearAutoSaveTimer, [path, clearAutoSaveTimer]);
 
-  return { doc, dirty, onChange, save, reload, adoptDiskText, openAnyway };
+  return {
+    doc,
+    dirty,
+    onChange,
+    save,
+    reload,
+    adoptDiskText,
+    openAnyway,
+    reopenWithEncoding,
+  };
 }

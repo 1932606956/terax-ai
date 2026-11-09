@@ -1,3 +1,10 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { t } from "@/i18n/zh";
 import { endpointIdFromCompatModel } from "@/modules/ai/config";
 import { getCustomEndpointKey } from "@/modules/ai/lib/keyring";
@@ -102,10 +109,59 @@ type Props = {
 // parse tree and a didOpen of that size cost far more than they give.
 const SYNTAX_MAX_BYTES = 4 * 1024 * 1024;
 
+const ENCODING_OPTIONS = [
+  { value: "UTF-8", label: "UTF-8" },
+  { value: "GBK", label: "GBK / GB2312" },
+  { value: "GB18030", label: "GB18030" },
+  { value: "Big5", label: "Big5" },
+  { value: "Shift_JIS", label: "Shift_JIS" },
+  { value: "UTF-16LE", label: "UTF-16 LE" },
+  { value: "UTF-16BE", label: "UTF-16 BE" },
+] as const;
+
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function EncodingSelect({
+  value,
+  busy,
+  onChange,
+}: {
+  value: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+}) {
+  const options: { value: string; label: string }[] = [...ENCODING_OPTIONS];
+  if (value !== "auto" && !options.some((entry) => entry.value === value)) {
+    options.push({ value, label: value });
+  }
+  return (
+    <Select value={value} onValueChange={onChange} disabled={busy}>
+      <SelectTrigger
+        aria-label={t("editor.encoding")}
+        className="h-5 w-36 border-0 bg-transparent px-1 text-[10.5px] shadow-none focus:ring-0"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="auto" className="text-[11px]">
+          {t("editor.encodingAuto")}
+        </SelectItem>
+        {options.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            className="text-[11px]"
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 // memo: EditorStack passes identity-stable props, so background editors
@@ -121,12 +177,25 @@ export const EditorPane = memo(
       mediaActive = true,
     } = props;
 
-    const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
-      useDocument({
-        path,
-        onDirtyChange,
-      });
-    const assetGrant = useAssetGrant((doc.status === "binary" || doc.status === "toolarge") && mediaPreviewKind(path) ? path : null);
+    const {
+      doc,
+      dirty,
+      onChange,
+      save,
+      reload,
+      adoptDiskText,
+      openAnyway,
+      reopenWithEncoding,
+    } = useDocument({
+      path,
+      onDirtyChange,
+    });
+    const assetGrant = useAssetGrant(
+      (doc.status === "binary" || doc.status === "toolarge") &&
+        mediaPreviewKind(path)
+        ? path
+        : null,
+    );
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const adoptDiskTextRef = useRef(adoptDiskText);
@@ -139,7 +208,31 @@ export const EditorPane = memo(
     );
     const languageRef = useRef<string | null>(null);
     const [langId, setLangId] = useState<string | null>(null);
+    const [encodingBusy, setEncodingBusy] = useState(false);
     const apiKeyRef = useRef<string | null>(null);
+
+    const changeEncoding = useCallback(
+      async (next: string) => {
+        const current = doc.status === "ready" ? doc.encoding : null;
+        if (next !== "auto" && next === current) return;
+        if (dirty) {
+          toast.warning(t("editor.encodingDirty"));
+          return;
+        }
+        setEncodingBusy(true);
+        try {
+          const ok = await reopenWithEncoding(next === "auto" ? null : next);
+          if (!ok) toast.warning(t("editor.encodingFailed"));
+        } catch (error) {
+          toast.error(t("editor.encodingFailed"), {
+            description: String(error),
+          });
+        } finally {
+          setEncodingBusy(false);
+        }
+      },
+      [doc, dirty, reopenWithEncoding],
+    );
 
     useEffect(() => {
       let cancelled = false;
@@ -215,7 +308,15 @@ export const EditorPane = memo(
       // Snapshot before save: edits typed during the formatter round-trip
       // must not be clobbered by the disk read-back.
       const docAtSave = view?.state.doc;
-      const saved = await saveRef.current();
+      let saved: boolean;
+      try {
+        saved = await saveRef.current();
+      } catch (error) {
+        toast.error(t("editor.saveFailed"), {
+          description: String(error),
+        });
+        return;
+      }
       if (!saved) return;
       if (prefs.editorFormatOnSave && formatter !== "lsp") {
         const error = await runExternalFormatter(
@@ -230,7 +331,12 @@ export const EditorPane = memo(
           if (readBack !== null && view && view.state.doc === docAtSave) {
             applyFormattedContent(
               view,
-              adoptDiskTextRef.current(readBack.text, readBack.mtime),
+              adoptDiskTextRef.current(
+                readBack.text,
+                readBack.mtime,
+                readBack.encoding,
+                readBack.bom,
+              ),
             );
           }
         }
@@ -561,11 +667,27 @@ export const EditorPane = memo(
 
       if (isImage || isVideo || isAudio || isPdf) {
         const assetUrl = assetGrant.urlFor(path);
-        if (!assetUrl) return (
-          <div className="p-4 text-xs text-muted-foreground">
-            {assetGrant.error ? <><p role="alert">Media preview unavailable: {assetGrant.error}</p><button type="button" className="mt-2 underline" onClick={assetGrant.retry}>Retry</button></> : "Loading media preview…"}
-          </div>
-        );
+        if (!assetUrl)
+          return (
+            <div className="p-4 text-xs text-muted-foreground">
+              {assetGrant.error ? (
+                <>
+                  <p role="alert">
+                    Media preview unavailable: {assetGrant.error}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 underline"
+                    onClick={assetGrant.retry}
+                  >
+                    Retry
+                  </button>
+                </>
+              ) : (
+                "Loading media preview…"
+              )}
+            </div>
+          );
         return (
           <div className="flex h-full min-h-0 flex-col items-center justify-center bg-background p-4 overflow-auto">
             {isImage && (
@@ -607,6 +729,16 @@ export const EditorPane = memo(
             {formatBytes(doc.size)} ·{" "}
             {canForce ? "syntax features disabled" : "preview not supported"}
           </div>
+          {doc.status === "binary" ? (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{t("editor.tryEncoding")}</span>
+              <EncodingSelect
+                value="auto"
+                busy={encodingBusy}
+                onChange={(value) => void changeEncoding(value)}
+              />
+            </div>
+          ) : null}
           {canForce && (
             <button
               type="button"
@@ -642,6 +774,14 @@ export const EditorPane = memo(
             searchKeymap: true,
           }}
         />
+        <div className="flex h-6 shrink-0 items-center justify-end gap-1.5 border-t border-border/40 px-2 text-[10.5px] text-muted-foreground">
+          <span>{t("editor.encoding")}</span>
+          <EncodingSelect
+            value={doc.encoding}
+            busy={encodingBusy}
+            onChange={(value) => void changeEncoding(value)}
+          />
+        </div>
       </div>
     );
   }),

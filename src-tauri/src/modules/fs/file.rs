@@ -5,11 +5,12 @@ use std::{
     io::{Read, Write},
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tempfile::NamedTempFile;
 
 use super::blocking;
+use super::encoding::{decode_text, encode_text, is_utf16_label};
 use super::index::FileIndexState;
 use super::mutate::note_changed;
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
@@ -19,6 +20,13 @@ const MAX_READ_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 const FORCE_MAX_READ_BYTES: u64 = 50 * 1024 * 1024;
 const BINARY_SNIFF_BYTES: usize = 8 * 1024;
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteOptions {
+    pub encoding: Option<String>,
+    pub bom: Option<bool>,
+}
+
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum ReadResult {
@@ -26,6 +34,8 @@ pub enum ReadResult {
         content: String,
         size: u64,
         mtime: u64,
+        encoding: String,
+        bom: bool,
     },
     Binary {
         size: u64,
@@ -65,15 +75,29 @@ pub async fn fs_read_file(
     path: String,
     workspace: Option<WorkspaceEnv>,
     force: Option<bool>,
+    encoding: Option<String>,
 ) -> Result<ReadResult, String> {
     blocking(move || {
         let workspace = WorkspaceEnv::from_option(workspace);
-        read_file_sync(&resolve_path(&path, &workspace), force.unwrap_or(false))
+        read_file_sync_with_encoding(
+            &resolve_path(&path, &workspace),
+            force.unwrap_or(false),
+            encoding.as_deref(),
+        )
     })
     .await
 }
 
+#[cfg(test)]
 fn read_file_sync(p: &Path, force: bool) -> Result<ReadResult, String> {
+    read_file_sync_with_encoding(p, force, None)
+}
+
+fn read_file_sync_with_encoding(
+    p: &Path,
+    force: bool,
+    encoding: Option<&str>,
+) -> Result<ReadResult, String> {
     let before = std::fs::metadata(p).map_err(|e| {
         log::debug!("fs_read_file stat({}) failed: {e}", p.display());
         e.to_string()
@@ -114,21 +138,28 @@ fn read_file_sync(p: &Path, force: bool) -> Result<ReadResult, String> {
         return Ok(ReadResult::TooLarge { size, limit });
     }
 
-    // Null-byte sniff on the first chunk. Not perfect (misses UTF-16 BOM
-    // cases) but catches the common "this is a PNG" mistake cheaply.
+    // Null-byte sniff on the first chunk. UTF-16 with a BOM is handled first
+    // by the decoder; everything else with NULs is binary.
     let sniff_len = bytes.len().min(BINARY_SNIFF_BYTES);
-    if bytes[..sniff_len].contains(&0) {
+    let utf16_hint = encoding.map(is_utf16_label).unwrap_or(false);
+    if bytes[..sniff_len].contains(&0) && !has_utf16_bom(&bytes) && !utf16_hint {
         return Ok(ReadResult::Binary { size });
     }
 
-    match String::from_utf8(bytes) {
-        Ok(content) => Ok(ReadResult::Text {
-            content,
+    match decode_text(&bytes, encoding) {
+        Some(decoded) => Ok(ReadResult::Text {
+            content: decoded.content,
             size,
             mtime: mtime_millis(&meta),
+            encoding: decoded.encoding.to_string(),
+            bom: decoded.bom,
         }),
-        Err(_) => Ok(ReadResult::Binary { size }),
+        None => Ok(ReadResult::Binary { size }),
     }
+}
+
+fn has_utf16_bom(bytes: &[u8]) -> bool {
+    bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff])
 }
 
 fn read_bounded(reader: impl Read, limit: u64) -> std::io::Result<Vec<u8>> {
@@ -165,6 +196,7 @@ pub async fn fs_write_file(
     content: String,
     workspace: Option<WorkspaceEnv>,
     source: Option<String>,
+    options: Option<WriteOptions>,
     app: tauri::AppHandle,
     index: tauri::State<'_, FileIndexState>,
 ) -> Result<u64, String> {
@@ -173,7 +205,13 @@ pub async fn fs_write_file(
         let workspace = WorkspaceEnv::from_option(workspace);
         let target = resolve_path(&path, &workspace);
         let original = fs::metadata(&target).ok();
-        write_atomic(&target, content.as_bytes()).map_err(|e| {
+        let encoding = options.as_ref().and_then(|value| value.encoding.as_deref());
+        let bom = options
+            .as_ref()
+            .and_then(|value| value.bom)
+            .unwrap_or(false);
+        let bytes = encode_text(&content, encoding, bom)?;
+        write_atomic(&target, &bytes).map_err(|e| {
             log::warn!("fs_write_file({}) failed: {e}", target.display());
             e.to_string()
         })?;
@@ -482,10 +520,14 @@ mod tests {
                 content,
                 size,
                 mtime,
+                encoding,
+                bom,
             } => {
                 assert_eq!(content, "hello world");
                 assert_eq!(size, 11);
                 assert!(mtime > 0);
+                assert_eq!(encoding, "UTF-8");
+                assert!(!bom);
             }
             _ => panic!("expected text"),
         }
@@ -506,12 +548,63 @@ mod tests {
     fn read_file_detects_binary_via_invalid_utf8() {
         let dir = tempfile::tempdir().unwrap();
         let f = dir.path().join("a.bin");
-        // Invalid UTF-8 with no null byte: must still classify as binary.
-        std::fs::write(&f, [0xff, 0xfe, 0xfd, 0xfc]).unwrap();
-        assert!(matches!(
-            read_file_sync(&f, false).unwrap(),
-            ReadResult::Binary { .. }
-        ));
+        // Invalid UTF-8 with no null byte or BOM: must still classify as binary.
+        std::fs::write(&f, [0x81, 0x20, 0x81, 0x20]).unwrap();
+        match read_file_sync(&f, false).unwrap() {
+            ReadResult::Binary { .. } => {}
+            ReadResult::Text {
+                encoding, content, ..
+            } => {
+                panic!("decoded as {encoding}: {content:?}")
+            }
+            _ => panic!("unexpected read result"),
+        }
+    }
+
+    #[test]
+    fn read_file_decodes_gbk_instead_of_calling_it_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("gbk.txt");
+        let (bytes, _, had_errors) = encoding_rs::GBK.encode("中文测试");
+        assert!(!had_errors);
+        std::fs::write(&f, bytes.as_ref()).unwrap();
+        match read_file_sync(&f, false).unwrap() {
+            ReadResult::Text {
+                content,
+                encoding,
+                bom,
+                ..
+            } => {
+                assert_eq!(content, "中文测试");
+                assert_eq!(encoding, "GBK");
+                assert!(!bom);
+            }
+            _ => panic!("expected decoded text"),
+        }
+    }
+
+    #[test]
+    fn read_file_detects_utf16le_with_bom() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("utf16.txt");
+        let mut bytes = vec![0xff, 0xfe];
+        for unit in "中文".encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        std::fs::write(&f, bytes).unwrap();
+        match read_file_sync(&f, false).unwrap() {
+            ReadResult::Text {
+                content,
+                encoding,
+                bom,
+                ..
+            } => {
+                assert_eq!(content, "中文");
+                assert_eq!(encoding, "UTF-16LE");
+                assert!(bom);
+            }
+            _ => panic!("expected decoded text"),
+        }
     }
 
     #[test]

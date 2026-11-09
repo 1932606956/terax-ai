@@ -314,6 +314,12 @@ const zh: Record<string, string> = {
   "ed.externalOpenProgramPlaceholder": "程序名，如 designer",
   "ed.externalOpenAdd": "添加映射",
   "ed.externalOpenRemove": "移除映射",
+  "editor.encoding": "编码",
+  "editor.encodingAuto": "自动检测",
+  "editor.encodingDirty": "请先保存或撤销未保存的修改，再切换编码",
+  "editor.encodingFailed": "切换编码失败",
+  "editor.saveFailed": "保存失败",
+  "editor.tryEncoding": "尝试编码",
 
   // settings: agents section
   "ag.title": "Agent",

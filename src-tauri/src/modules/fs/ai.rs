@@ -7,6 +7,7 @@ use ignore::WalkBuilder;
 use regex::RegexBuilder;
 use tauri::Manager;
 
+use super::encoding::decode_text;
 use super::file::ReadResult;
 use super::grep::{GlobHit, GlobResponse, GrepHit, GrepResponse};
 use super::read_policy::readable;
@@ -135,17 +136,16 @@ pub fn read_file(
     if size > limit {
         return Ok(ReadResult::TooLarge { size, limit });
     }
-    if bytes.contains(&0) {
-        return Ok(ReadResult::Binary { size });
-    }
-    Ok(match String::from_utf8(bytes) {
-        Ok(content) => ReadResult::Text {
-            content,
+    match decode_text(&bytes, None) {
+        Some(decoded) => Ok(ReadResult::Text {
+            content: decoded.content,
             size,
             mtime: 0,
-        },
-        Err(_) => ReadResult::Binary { size },
-    })
+            encoding: decoded.encoding.to_string(),
+            bom: decoded.bom,
+        }),
+        None => Ok(ReadResult::Binary { size }),
+    }
 }
 
 #[tauri::command]

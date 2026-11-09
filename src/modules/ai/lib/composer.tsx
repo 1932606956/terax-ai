@@ -169,6 +169,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
       const result = await invoke<ReadResult>("fs_read_file", {
         path,
         workspace: currentWorkspaceEnv(),
+        encoding: null,
       });
       if (result.kind !== "text") {
         // Binary/oversize files: skip (could surface a toast in future).

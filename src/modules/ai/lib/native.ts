@@ -2,7 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { currentWorkspaceEnv, type WorkspaceEnv } from "@/modules/workspace";
 
 export type ReadResult =
-  | { kind: "text"; content: string; size: number }
+  | {
+      kind: "text";
+      content: string;
+      size: number;
+      encoding: string;
+      bom: boolean;
+    }
   | { kind: "binary"; size: number }
   | { kind: "toolarge"; size: number; limit: number };
 
@@ -45,7 +51,11 @@ export const native = {
       path,
       workspace: currentWorkspaceEnv(),
     }),
-  readProjectMemory: (root: string, checkedPath: string, workspace: WorkspaceEnv) =>
+  readProjectMemory: (
+    root: string,
+    checkedPath: string,
+    workspace: WorkspaceEnv,
+  ) =>
     invoke<string | null>("fs_read_project_memory", {
       root,
       checkedPath,
@@ -61,6 +71,10 @@ export const native = {
       path,
       content,
       workspace: currentWorkspaceEnv(),
+      options: {
+        encoding: null,
+        bom: false,
+      },
     }),
   canonicalize: (path: string, workspace = currentWorkspaceEnv()) =>
     invoke<string>("fs_canonicalize", {
@@ -101,11 +115,7 @@ export const native = {
       maxResults: params.maxResults ?? null,
       workspace: currentWorkspaceEnv(),
     }),
-  runCommand: (
-    command: string,
-    cwd?: string | null,
-    timeoutSecs?: number,
-  ) =>
+  runCommand: (command: string, cwd?: string | null, timeoutSecs?: number) =>
     invoke<CommandOutput>("shell_run_command", {
       command,
       cwd: cwd ?? null,
