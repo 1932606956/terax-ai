@@ -1,5 +1,5 @@
 import { t } from "@/i18n/zh";
-import type { PaletteMode } from "../types";
+import type { PaletteBase, PaletteMode } from "../types";
 
 export type ParsedQuery = {
   mode: PaletteMode;
@@ -7,22 +7,47 @@ export type ParsedQuery = {
   raw: string;
 };
 
-const PREFIXES: ReadonlyArray<{ sigil: string; mode: PaletteMode }> = [
-  { sigil: ">", mode: "history" },
-  { sigil: "#", mode: "content" },
-  { sigil: "?", mode: "help" },
+const PREFIXES: ReadonlyArray<{
+  sigil: string;
+  mode: PaletteMode;
+  bases: readonly PaletteBase[];
+}> = [
+  { sigil: ">", mode: "history", bases: ["commands", "files"] },
+  { sigil: "#", mode: "content", bases: ["commands", "files"] },
+  { sigil: "?", mode: "help", bases: ["commands", "files"] },
+  { sigil: "/", mode: "files", bases: ["commands"] },
 ];
 
-export function parseQuery(raw: string): ParsedQuery {
-  for (const { sigil, mode } of PREFIXES) {
-    if (raw.startsWith(sigil)) {
+/**
+ * `base` is what a query without a sigil means: Cmd+Shift+P opens the palette
+ * on commands, Cmd+P on files. A sigil switches mode in either.
+ */
+export function parseQuery(
+  raw: string,
+  base: PaletteBase = "commands",
+): ParsedQuery {
+  for (const { sigil, mode, bases } of PREFIXES) {
+    if (raw.startsWith(sigil) && bases.includes(base)) {
       return { mode, term: raw.slice(sigil.length).trim(), raw };
     }
   }
-  return { mode: "commands", term: raw.trim(), raw };
+  return { mode: base, term: raw.trim(), raw };
 }
 
-export const MODE_HINTS: ReadonlyArray<{ sigil: string; label: string }> = [
-  { sigil: ">", label: t("palette.searchCommandHistory") },
-  { sigil: "#", label: t("palette.findContentInFiles") },
+export const MODE_HINTS: ReadonlyArray<{
+  sigil: string;
+  label: string;
+  bases: readonly PaletteBase[];
+}> = [
+  { sigil: "/", label: t("palette.goToFile"), bases: ["commands"] },
+  {
+    sigil: ">",
+    label: t("palette.searchCommandHistory"),
+    bases: ["commands", "files"],
+  },
+  {
+    sigil: "#",
+    label: t("palette.findContentInFiles"),
+    bases: ["commands", "files"],
+  },
 ];
