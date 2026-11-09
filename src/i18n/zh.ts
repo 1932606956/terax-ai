@@ -37,6 +37,7 @@ const zh: Record<string, string> = {
   "palette.toggleSourceControl": "切换源代码管理",
   "palette.findContentInFiles": "在文件中查找内容",
   "palette.searchCommandHistory": "搜索命令历史",
+  "palette.goToFile": "转到文件",
   "palette.findInCurrentTab": "在当前标签页中查找",
   "palette.searchFilesByName": "按名称搜索文件",
   "palette.toggleFileExplorer": "切换文件资源管理器",
@@ -58,7 +59,8 @@ const zh: Record<string, string> = {
   "palette.ph.searchThemes": "搜索主题...",
   "palette.ph.findText": "在文件中查找文本...",
   "palette.ph.searchHistory": "搜索命令历史...",
-  "palette.ph.default": "输入命令，> 查历史，# 在文件中查找",
+  "palette.ph.goToFile": "转到文件...（可加 :行号 跳转）",
+  "palette.ph.default": "输入命令，/ 转到文件，> 查历史，# 在文件中查找",
   "palette.noThemes": "没有主题",
   "palette.typeAtLeast2": "至少输入 2 个字符",
   "palette.noMatches": "无匹配结果",
@@ -290,7 +292,7 @@ const zh: Record<string, string> = {
   "ed.autoSave": "自动保存",
   "ed.autoSaveDesc": "检测到更改后延迟自动保存文件。",
   "ed.formatOnSave": "保存时格式化",
-  "ed.formatOnSaveDesc": "显式保存（Cmd+S / :w）时使用下方格式化器格式化文件。",
+  "ed.formatOnSaveDesc": "显式保存（{n} / :w）时使用下方格式化器格式化文件。",
   "ed.formatter": "格式化器",
   "ed.formatterDesc":
     "语言服务器在写入前格式化缓冲区；外部工具对保存后的文件执行（需在 PATH 中）。",
@@ -526,6 +528,7 @@ const zh: Record<string, string> = {
 
   // shortcut action labels
   "sc.action.openCommandPalette": "打开命令面板",
+  "sc.action.goToFile": "转到文件",
   "sc.action.findInFiles": "在文件中查找",
   "sc.action.openSettings": "打开设置",
   "sc.action.newTab": "新建标签页",
