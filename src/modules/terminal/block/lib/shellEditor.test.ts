@@ -117,7 +117,7 @@ function required<T>(value: T | null | undefined): T {
 
 it("names the shortcut that switches to the AI input in the placeholder", () => {
   expect(shellPlaceholder("Ctrl+Shift+Y")).toBe(
-    "Run a command  -  ↑ history  Ctrl+Shift+Y switch to AI",
+    "运行命令  -  ↑ 历史  Ctrl+Shift+Y 切换到 AI",
   );
   expect(shellPlaceholder("⌘U")).toContain("⌘U");
 });
