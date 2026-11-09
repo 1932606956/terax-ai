@@ -65,6 +65,27 @@ export type SourceControlFileEntry = {
   untracked: boolean;
 };
 
+export function stageRange(
+  entries: readonly SourceControlFileEntry[],
+  anchorKey: string,
+  targetKey: string,
+): SourceControlFileEntry[] {
+  const anchor = entries.findIndex((entry) => entry.key === anchorKey);
+  const target = entries.findIndex((entry) => entry.key === targetKey);
+  if (anchor < 0 || target < 0) return [];
+  const start = Math.min(anchor, target);
+  const end = Math.max(anchor, target);
+  return entries.slice(start, end + 1);
+}
+
+export function orderFileEntries(
+  entries: readonly SourceControlFileEntry[],
+): SourceControlFileEntry[] {
+  return [...entries].sort((a, b) =>
+    a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+  );
+}
+
 type PendingDiscard = {
   scope: "single" | "all";
   count: number;
@@ -102,6 +123,10 @@ type SourceControlPanelState = {
   stageEntry: (entry: SourceControlEntry) => Promise<void>;
   unstageEntry: (entry: SourceControlEntry) => Promise<void>;
   toggleStageFile: (entry: SourceControlFileEntry) => Promise<void>;
+  toggleStageFiles: (
+    entries: readonly SourceControlFileEntry[],
+    stage: boolean,
+  ) => Promise<void>;
   toggleAll: () => Promise<void>;
   requestDiscardEntry: (entry: SourceControlEntry) => void;
   requestDiscardFile: (entry: SourceControlFileEntry) => void;
@@ -263,7 +288,8 @@ function optimisticStage(
     if (!paths.has(file.path)) return file;
     if (file.staged && !file.unstaged) return file;
     changed = true;
-    const wt = file.worktreeStatus !== " " ? file.worktreeStatus : file.indexStatus;
+    const wt =
+      file.worktreeStatus !== " " ? file.worktreeStatus : file.indexStatus;
     return {
       ...file,
       indexStatus: wt,
@@ -293,7 +319,8 @@ function optimisticUnstage(
       continue;
     }
     changed = true;
-    const idx = file.indexStatus !== " " ? file.indexStatus : file.worktreeStatus;
+    const idx =
+      file.indexStatus !== " " ? file.indexStatus : file.worktreeStatus;
     if (idx === "R" && file.originalPath) {
       next.push({
         path: file.originalPath,
@@ -454,7 +481,7 @@ export function useSourceControlPanel(
         untracked: file.untracked,
       });
     }
-    return out;
+    return orderFileEntries(out);
   }, [status]);
 
   const headerCheckState = useMemo<CheckState>(() => {
@@ -553,7 +580,11 @@ export function useSourceControlPanel(
   useEffect(() => () => cancelReconcile(), [cancelReconcile]);
 
   const openSelection = useCallback(
-    (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined) => {
+    (
+      sel: DiffSelection,
+      repoRoot: string,
+      file: GitChangedFile | undefined,
+    ) => {
       onOpenDiff?.({
         path: sel.path,
         repoRoot,
@@ -651,7 +682,10 @@ export function useSourceControlPanel(
   const selectEntry = useCallback(
     async (entry: SourceControlEntry) => {
       if (!repo) return;
-      const nextSelection: DiffSelection = { path: entry.path, mode: entry.mode };
+      const nextSelection: DiffSelection = {
+        path: entry.path,
+        mode: entry.mode,
+      };
       if (sameSelection(selected, nextSelection)) {
         setActionError(null);
         setActionMessage(null);
@@ -831,6 +865,29 @@ export function useSourceControlPanel(
     [repo, runMutation],
   );
 
+  const toggleStageFiles = useCallback(
+    async (entries: readonly SourceControlFileEntry[], stage: boolean) => {
+      if (!repo) return;
+      const targets = entries.filter((entry) =>
+        stage ? entry.checkState !== "checked" : entry.staged,
+      );
+      if (targets.length === 0) return;
+      const paths = targets.map((entry) => entry.path);
+      const pathSet = new Set(paths);
+      await runMutation(
+        stage ? "stage:range" : "unstage:range",
+        (s) =>
+          stage ? optimisticStage(s, pathSet) : optimisticUnstage(s, pathSet),
+        () =>
+          stage
+            ? git.stage(repo.repoRoot, paths)
+            : git.unstage(repo.repoRoot, paths),
+        paths,
+      );
+    },
+    [repo, runMutation],
+  );
+
   const toggleAll = useCallback(async () => {
     if (headerCheckState === "checked") await unstageAllEntries();
     else await stageAllEntries();
@@ -940,10 +997,7 @@ export function useSourceControlPanel(
       const result = await git.commit(repo.repoRoot, commitMessage);
       setCommitMessage("");
       setActionMessage(
-        t(
-          "scm.committed",
-          `${result.commitSha.slice(0, 7)} ${result.summary}`,
-        ),
+        t("scm.committed", `${result.commitSha.slice(0, 7)} ${result.summary}`),
       );
       invalidateRepoDiffs(repo.repoRoot);
       await summary.refresh({ remote: "never" });
@@ -984,10 +1038,7 @@ export function useSourceControlPanel(
     return {
       scope: "all",
       count: pendingDiscard.entries.length,
-      label: t(
-        "scm.unstagedFilesCount",
-        String(pendingDiscard.entries.length),
-      ),
+      label: t("scm.unstagedFilesCount", String(pendingDiscard.entries.length)),
     };
   }, [pendingDiscard]);
 
@@ -1022,6 +1073,7 @@ export function useSourceControlPanel(
     stageEntry,
     unstageEntry,
     toggleStageFile,
+    toggleStageFiles,
     toggleAll,
     requestDiscardEntry,
     requestDiscardFile,

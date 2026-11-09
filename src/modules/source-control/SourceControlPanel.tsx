@@ -61,8 +61,8 @@ import {
   FolderGitTwoIcon,
   GitBranchIcon,
   Refresh01Icon,
-  RemoveSquareIcon,
   Tick02Icon,
+  Undo03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -85,6 +85,7 @@ import type { SourceControlSummary } from "./useSourceControl";
 import {
   type CheckState,
   type SourceControlFileEntry,
+  stageRange,
   useSourceControlPanel,
 } from "./useSourceControlPanel";
 
@@ -404,6 +405,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
+  const stageAnchorRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -513,6 +515,22 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       }, 450);
     });
   }, [scm]);
+
+  const handleToggleStageFile = useCallback(
+    (entry: SourceControlFileEntry, shiftKey = false) => {
+      const anchorKey = stageAnchorRef.current;
+      if (shiftKey && anchorKey && anchorKey !== entry.key) {
+        const range = stageRange(scm.fileEntries, anchorKey, entry.key);
+        if (range.length > 0) {
+          void scm.toggleStageFiles(range, entry.checkState !== "checked");
+          return;
+        }
+      }
+      stageAnchorRef.current = entry.key;
+      void scm.toggleStageFile(entry);
+    },
+    [scm],
+  );
 
   const handleFetch = useCallback(() => {
     void sourceControl.runRemoteAction("fetch");
@@ -1035,7 +1053,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             onFocusRow={setFocusedRowKey}
                             onToggleAll={scm.toggleAll}
                             onSelectFile={scm.selectFile}
-                            onToggleStageFile={scm.toggleStageFile}
+                            onToggleStageFile={handleToggleStageFile}
                             onDiscardFile={scm.requestDiscardFile}
                             onOpenFile={onOpenFile}
                           />
@@ -1133,7 +1151,10 @@ type RowRendererProps = {
   onFocusRow: (key: string | null) => void;
   onToggleAll: () => Promise<void> | void;
   onSelectFile: (entry: SourceControlFileEntry) => Promise<void>;
-  onToggleStageFile: (entry: SourceControlFileEntry) => Promise<void>;
+  onToggleStageFile: (
+    entry: SourceControlFileEntry,
+    shiftKey?: boolean,
+  ) => Promise<void> | void;
   onDiscardFile: (entry: SourceControlFileEntry) => void;
   onOpenFile?: (absolutePath: string) => void;
 };
@@ -1300,7 +1321,7 @@ const EntryRow = memo(function EntryRow({
                   <Spinner className="size-3" />
                 ) : (
                   <HugeiconsIcon
-                    icon={RemoveSquareIcon}
+                    icon={Undo03Icon}
                     size={11}
                     strokeWidth={1.9}
                   />
@@ -1317,7 +1338,10 @@ const EntryRow = memo(function EntryRow({
                 aria-label={t("scm.stageFile", entry.path)}
                 checked={checkboxValue(entry.checkState)}
                 disabled={disabled}
-                onCheckedChange={() => void onToggleStageFile(entry)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleStageFile(entry, event.shiftKey);
+                }}
                 className="size-3.5"
               />
             )}
