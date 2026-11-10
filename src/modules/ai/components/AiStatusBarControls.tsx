@@ -14,6 +14,7 @@ import {
   Add01Icon,
   AiBookIcon,
   ArrowDown01Icon,
+  ArrowUp01Icon,
   Clock01Icon,
   FavouriteIcon,
   Search01Icon,
@@ -28,9 +29,25 @@ import { useChatStore } from "../store/chatStore";
 
 type Tab = "all" | "favorites" | "recent";
 
-/** Status-bar model picker: every choice comes from a custom endpoint. */
+/** Status-bar model picker + explicit panel collapse control. */
 export function AiStatusBarControls() {
-  return <ModelDropdown />;
+  const closePanel = useChatStore((s) => s.closePanel);
+  return (
+    <div className="flex items-center gap-0.5">
+      <ModelDropdown />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={closePanel}
+        aria-label={t("ai.collapse")}
+        title={t("ai.collapse")}
+        className="my-1 h-5.5 w-5.5 rounded-md p-0 text-muted-foreground hover:bg-accent hover:text-foreground"
+      >
+        <HugeiconsIcon icon={ArrowUp01Icon} size={12} strokeWidth={1.75} />
+      </Button>
+    </div>
+  );
 }
 
 /** Opens the AI panel when it is closed. */

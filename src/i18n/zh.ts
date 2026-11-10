@@ -192,6 +192,7 @@ const zh: Record<string, string> = {
   "ai.noMatches": "无匹配结果",
   "ai.favorite": "收藏",
   "ai.open": "AI",
+  "ai.collapse": "收起 AI",
   "ai.noEndpointSend": "先添加一个自定义接口，然后就能在这里对话了。",
 
   // settings: general section
