@@ -14,6 +14,7 @@ const terminalTab: Tab = {
   id: 1,
   kind: "terminal",
   spaceId: "space-a",
+  scopeId: "scope-space-a-terminal-1",
   title: "shell",
   paneTree: { kind: "leaf", id: 10 },
   activeLeafId: 10,
@@ -23,6 +24,7 @@ const editorTab: Tab = {
   id: 2,
   kind: "editor",
   spaceId: "space-a",
+  scopeId: "scope-space-a-editor-2",
   title: "main.ts",
   path: "C:\\repo\\src\\main.ts",
   dirty: false,
@@ -33,6 +35,7 @@ const historyTab: Tab = {
   id: 3,
   kind: "git-history",
   spaceId: "space-a",
+  scopeId: "scope-space-a-history-3",
   title: "History",
   repoRoot: "/repos/history",
 };

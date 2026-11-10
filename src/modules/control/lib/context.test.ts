@@ -7,6 +7,7 @@ const tabs: Tab[] = [
     id: 10,
     kind: "terminal",
     spaceId: "agent-space",
+    scopeId: "scope-agent-10",
     title: "agent",
     paneTree: {
       kind: "split",
@@ -23,6 +24,7 @@ const tabs: Tab[] = [
     id: 20,
     kind: "editor",
     spaceId: "active-space",
+    scopeId: "scope-active-20",
     title: "main.rs",
     path: "/workspace/main.rs",
     dirty: false,

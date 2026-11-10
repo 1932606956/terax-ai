@@ -10,6 +10,7 @@ function terminalTab(id: number): Tab {
     id,
     kind: "terminal",
     spaceId: "s",
+    scopeId: `scope-s-${id}`,
     title: "shell",
     paneTree: { kind: "leaf", id: id * 10 },
     activeLeafId: id * 10,

@@ -20,6 +20,7 @@ function renderEditor(path: string, activeId = 1) {
   const tab: EditorTab = {
     id: 1,
     kind: "editor",
+    scopeId: "scope-default-editor-1",
     title: path,
     path,
     dirty: false,

@@ -68,6 +68,7 @@ describe("path-backed explorer mutations", () => {
   ): EditorTab => ({
     id,
     kind: "editor",
+    scopeId: `scope-local-editor-${id}`,
     title: path,
     path,
     dirty,
@@ -78,6 +79,7 @@ describe("path-backed explorer mutations", () => {
   const markdown = (id: number, path: string): MarkdownTab => ({
     id,
     kind: "markdown",
+    scopeId: `scope-local-markdown-${id}`,
     title: path,
     path,
     spaceId: "local",
