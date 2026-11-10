@@ -7,6 +7,7 @@ function terminalTab(over: Partial<TerminalTab> = {}): TerminalTab {
     id: 1,
     kind: "terminal",
     spaceId: "default",
+    scopeId: "scope-default-1",
     title: "shell",
     paneTree: { kind: "leaf", id: 2 },
     activeLeafId: 2,

@@ -6,6 +6,7 @@ function tab(id: number, spaceId: string, kind: Tab["kind"] = "editor"): Tab {
     id,
     kind,
     spaceId,
+    scopeId: `scope-${spaceId}-${id}`,
     title: `tab-${id}`,
     path: `/file-${id}`,
     dirty: false,

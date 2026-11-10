@@ -389,6 +389,13 @@ export default function App() {
   useEditorFileSync({ tabs, tabsRef, editorRefs });
   useThemeFileEditing({ tabsRef, openFileTab });
 
+  // The AI assistant follows the active tab's chat scope (one per tab), so
+  // each tab keeps its own conversation, panel state and draft.
+  useEffect(() => {
+    const scopeId = activeTab?.scopeId;
+    if (scopeId) useChatStore.getState().setActiveScope(scopeId);
+  }, [activeTab?.scopeId]);
+
   const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(
     activeTab,
     tabs,
@@ -734,13 +741,13 @@ export default function App() {
 
   const handleOpenFile = useCallback(
     (path: string, pin?: boolean) => {
-      // Markdown opens in its rendered view by default; a per-tab toggle flips
-      // it to the raw editor. Every explorer and git entry lands in the peek
-      // card region, which owns file opening; `pin` is kept for the launch
-      // paths that restore a real workspace tab at startup.
-      if (isMarkdownPath(path)) newMarkdownTab(path);
-      else if (pin === true) openFileTab(path, true);
-      else usePeekStore.getState().open(path, activeSpaceIdRef.current);
+      // Peek owns file opening; pin opens a real workspace tab.
+      if (pin === true) {
+        if (isMarkdownPath(path)) newMarkdownTab(path);
+        else openFileTab(path, true);
+      } else {
+        usePeekStore.getState().open(path, activeSpaceIdRef.current);
+      }
     },
     [openFileTab, newMarkdownTab],
   );
@@ -1501,6 +1508,7 @@ export default function App() {
   useAiLiveBridge({
     setLive,
     activeId,
+    activeScopeId: activeTab?.scopeId ?? null,
     tabs,
     explorerRoot,
     launchCwd,
@@ -1722,7 +1730,14 @@ export default function App() {
           {hasComposer ? (
             <>
               <AgentRunBridge
-                openAiDiffTab={openAiDiffTab}
+                openAiDiffTab={(input) =>
+                  openAiDiffTab({
+                    ...input,
+                    // The diff belongs to the run's chat scope, which is
+                    // the active session's scope while the bridge streams.
+                    scopeId: useChatStore.getState().activeScopeId ?? "",
+                  })
+                }
                 closeAiDiffTab={closeAiDiffTab}
               />
               <LocalAgentNotificationsBridge />

@@ -17,6 +17,7 @@ function terminal(
     id,
     kind: "terminal",
     spaceId: "a",
+    scopeId: `scope-a-${id}`,
     title: "shell",
     paneTree: { kind: "leaf", id: leafId, cwd: "/a" },
     activeLeafId: leafId,

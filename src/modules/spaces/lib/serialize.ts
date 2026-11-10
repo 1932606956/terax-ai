@@ -1,3 +1,4 @@
+import { createTabScopeId } from "@/modules/tabs/lib/tabScope";
 import type {
   EditorTab,
   MarkdownTab,
@@ -10,7 +11,6 @@ import {
   type PaneNode,
   type SplitDir,
 } from "@/modules/terminal/lib/panes";
-
 type SerializedNode =
   | { kind: "leaf"; cwd?: string; active?: boolean }
   | { kind: "split"; dir: SplitDir; children: SerializedNode[] };
@@ -18,15 +18,16 @@ type SerializedNode =
 export type SerializedTab =
   | {
       kind: "terminal";
+      scopeId?: string;
       tree: SerializedNode;
       blocks?: boolean;
       locked?: boolean;
       customTitle?: string;
       customColor?: string;
     }
-  | { kind: "editor"; path: string }
-  | { kind: "preview"; url: string }
-  | { kind: "markdown"; path: string };
+  | { kind: "editor"; scopeId?: string; path: string }
+  | { kind: "preview"; scopeId?: string; url: string }
+  | { kind: "markdown"; scopeId?: string; path: string };
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -116,6 +117,7 @@ function serializeTab(tab: Tab): SerializedTab | null {
     case "terminal":
       return {
         kind: "terminal",
+        scopeId: tab.scopeId,
         tree: serializeNode(tab.paneTree, tab.activeLeafId),
         ...(tab.blocks && { blocks: true }),
         ...(tab.locked && { locked: true }),
@@ -123,11 +125,11 @@ function serializeTab(tab: Tab): SerializedTab | null {
         ...(tab.customColor !== undefined && { customColor: tab.customColor }),
       };
     case "editor":
-      return { kind: "editor", path: tab.path };
+      return { kind: "editor", scopeId: tab.scopeId, path: tab.path };
     case "preview":
-      return { kind: "preview", url: tab.url };
+      return { kind: "preview", scopeId: tab.scopeId, url: tab.url };
     case "markdown":
-      return { kind: "markdown", path: tab.path };
+      return { kind: "markdown", scopeId: tab.scopeId, path: tab.path };
     default:
       return null;
   }
@@ -204,6 +206,7 @@ function hydrateTab(
         id: allocId(),
         kind: "terminal",
         spaceId,
+        scopeId: s.scopeId ?? createTabScopeId(),
         cold: true,
         title,
         cwd: firstLeafCwd,
@@ -220,6 +223,7 @@ function hydrateTab(
         id: allocId(),
         kind: "editor",
         spaceId,
+        scopeId: s.scopeId ?? createTabScopeId(),
         cold: true,
         title: basename(s.path),
         path: s.path,
@@ -231,6 +235,7 @@ function hydrateTab(
         id: allocId(),
         kind: "preview",
         spaceId,
+        scopeId: s.scopeId ?? createTabScopeId(),
         cold: true,
         title: titleFromUrl(s.url),
         url: s.url,
@@ -240,6 +245,7 @@ function hydrateTab(
         id: allocId(),
         kind: "markdown",
         spaceId,
+        scopeId: s.scopeId ?? createTabScopeId(),
         cold: true,
         title: basename(s.path),
         path: s.path,
@@ -259,6 +265,7 @@ export function freshTerminalTab(
     id: allocId(),
     kind: "terminal",
     spaceId,
+    scopeId: createTabScopeId(),
     cold: true,
     title: cwd ? basename(cwd) : "shell",
     cwd: cwd ?? undefined,

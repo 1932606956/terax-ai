@@ -101,7 +101,9 @@ describe("session persistence", () => {
       sessions: [],
       activeId: null,
     });
-    const sessions = [{ id: "s-1", title: "T", createdAt: 1, updatedAt: 2 }];
+    const sessions = [
+      { id: "s-1", title: "T", createdAt: 1, updatedAt: 2, scopeId: "" },
+    ];
     storage.data.set("sessions", sessions);
     storage.data.set("activeId", "s-1");
     storage.files.set("s-1", message("retained on disk"));
@@ -186,7 +188,9 @@ describe("session persistence", () => {
 
   it("writes metadata independently and flushes both metadata and message writes", async () => {
     const mod = await reload();
-    const sessions = [{ id: "s-9", title: "X", createdAt: 0, updatedAt: 0 }];
+    const sessions = [
+      { id: "s-9", title: "X", createdAt: 0, updatedAt: 0, scopeId: "" },
+    ];
     void mod.saveSessionsList(sessions);
     void mod.saveActiveId("s-9");
     void mod.saveMessages("s-9", message("saved"));

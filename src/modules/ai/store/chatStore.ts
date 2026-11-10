@@ -30,6 +30,20 @@ import {
 } from "../lib/sessions";
 import { pushRecentModel } from "../lib/modelPrefs";
 import { persistDelay } from "../lib/persistSchedule";
+import type { FileAttachment } from "../lib/composer";
+import type { Snippet } from "../lib/snippets";
+import type { SlashCommandMeta } from "../lib/slashCommands";
+
+export type ScopeUIState = { panelOpen: boolean; miniOpen: boolean };
+
+export type ScopeDraft = {
+  value: string;
+  files: FileAttachment[];
+  pickedSnippets: Snippet[];
+  pickedCommands: SlashCommandMeta[];
+};
+
+type ApprovalResponder = (approvalId: string, approved: boolean) => void;
 
 export type Live = {
   getCwd: () => string | null;
@@ -93,8 +107,6 @@ type PendingSelection = {
   source: "terminal" | "editor";
 };
 
-type ApprovalResponder = (approvalId: string, approved: boolean) => void;
-
 type StoreState = {
   live: Live;
   setLive: (live: Live) => void;
@@ -140,6 +152,19 @@ type StoreState = {
   agentMeta: AgentMeta;
   patchAgentMeta: (patch: Partial<AgentMeta>) => void;
   resetAgentMeta: () => void;
+
+  // Chat scope isolation (one scope per top-level tab)
+  activeScopeId: string | null;
+  /** scopeId -> that scope's remembered active session id. */
+  scopeSessions: Record<string, string>;
+  /** scopeId -> panel/mini visibility remembered per scope. */
+  scopeUI: Record<string, ScopeUIState>;
+  /** scopeId -> composer draft remembered per scope. */
+  scopeDrafts: Record<string, ScopeDraft>;
+  /** Activates the scope of the active tab: swaps session/UI/draft state. */
+  setActiveScope: (scopeId: string) => void;
+  /** Merges a partial draft for a scope (composer saves on change). */
+  patchDraft: (scopeId: string, patch: Partial<ScopeDraft>) => void;
 
   // Sessions
   sessionsHydrated: boolean;
@@ -227,6 +252,99 @@ export function flushPersist(id?: string): void {
   for (const key of Array.from(pendingPersist.keys())) flushPersistEntry(key);
 }
 
+/** Guards async scope loads: only the newest activation may commit. */
+let scopeLoadGeneration = 0;
+
+/**
+ * Session choice for the active scope: adopt legacy scopeless rows, pick
+ * the remembered (or most recent) session, and activate it only when its
+ * messages are resident - a pending disk read parks the store instead.
+ * Called from setActiveScope and once after hydrate (the scope may have
+ * been set before the list loaded; the early return there would otherwise
+ * skip this pass).
+ */
+function reconcileActiveScope(
+  get: () => StoreState,
+  set: (partial: Partial<StoreState>) => void,
+  scopeId: string,
+): void {
+  const s = get();
+
+  // Legacy sessions (pre-scope data) are adopted by the first scope the
+  // user activates, keeping their ids and messages.
+  let sessions = s.sessions;
+  if (sessions.some((x) => x.scopeId === "")) {
+    sessions = sessions.map((x) =>
+      x.scopeId === "" ? { ...x, scopeId } : x,
+    );
+    void saveSessionsList(sessions);
+  }
+
+  const remembered = s.scopeSessions[scopeId];
+  const inScope = sessions
+    .filter((x) => x.scopeId === scopeId)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const target = remembered
+    ? sessions.find((x) => x.id === remembered)
+    : inScope[0];
+
+  if (!target) {
+    // No session for this scope yet: create a fresh one bound to it.
+    const id = newSessionId();
+    const meta: SessionMeta = {
+      id,
+      title: "New chat",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      scopeId,
+    };
+    const nextSessions = [meta, ...sessions];
+    set({
+      sessions: nextSessions,
+      activeSessionId: id,
+      scopeSessions: { ...s.scopeSessions, [scopeId]: id },
+    });
+    void saveSessionsList(nextSessions);
+    void saveActiveId(id);
+    return;
+  }
+
+  const activate = () => {
+    const cur = get();
+    set({
+      activeSessionId: target.id,
+      scopeSessions: { ...cur.scopeSessions, [scopeId]: target.id },
+    });
+    void saveActiveId(target.id);
+  };
+  if (chats.has(target.id) || seedMessages.has(target.id)) {
+    set({ sessions });
+    activate();
+    return;
+  }
+  // Park without an active session until the messages load: activating an
+  // unread session would let a send overwrite its file with an empty Chat.
+  set({ sessions, activeSessionId: null });
+  const generation = ++scopeLoadGeneration;
+  void loadMessages(target.id)
+    .then((m) => {
+      // Only the newest activation may commit.
+      if (generation !== scopeLoadGeneration) return;
+      if (get().activeScopeId !== scopeId) return;
+      if (m && m.length > 0 && !chats.has(target.id)) {
+        seedMessages.set(target.id, m);
+      }
+      activate();
+    })
+    .catch((error: unknown) => {
+      // Stay parked (switching sessions or re-entering retries): opening
+      // it empty could overwrite a healthy, momentarily unreadable file.
+      toast.error(t("toast.openConvFailed"), {
+        id: `conversation-open:${target.id}`,
+        description: String(error),
+      });
+    });
+}
 export const useChatStore = create<StoreState>((set, get) => ({
   live: NOOP_LIVE,
   setLive: (live) => set({ live }),
@@ -302,6 +420,64 @@ export const useChatStore = create<StoreState>((set, get) => ({
     set((s) => ({ agentMeta: { ...s.agentMeta, ...patch } })),
   resetAgentMeta: () => set({ agentMeta: IDLE_META }),
 
+  activeScopeId: null,
+  scopeSessions: {},
+  scopeUI: {},
+  scopeDrafts: {},
+  setActiveScope: (nextScopeId) => {
+    const s = get();
+    if (s.activeScopeId === nextScopeId) return;
+
+    // A running generation would keep executing tools against the live
+    // bridge, which reads the newly active tab's context: stop it rather
+    // than let one project's run act on another's terminal. A run parked on
+    // an approval card is safe to leave: it does nothing until answered.
+    const running =
+      s.agentMeta.status === "thinking" ||
+      s.agentMeta.status === "streaming";
+    if (running && s.activeSessionId) {
+      void chats.get(s.activeSessionId)?.stop();
+    }
+
+    // Remember the outgoing scope's panel/mini visibility so coming back
+    // restores what the user had, not the incoming scope's state.
+    const scopeUI = s.activeScopeId
+      ? {
+          ...s.scopeUI,
+          [s.activeScopeId]: {
+            panelOpen: s.panelOpen,
+            miniOpen: s.mini.open,
+          },
+        }
+      : s.scopeUI;
+    const ui = scopeUI[nextScopeId] ?? { panelOpen: false, miniOpen: false };
+
+    // Scope chrome swaps now; the session choice (including legacy
+    // adoption and safe message loads) is reconciled for the new scope.
+    set({
+      activeScopeId: nextScopeId,
+      scopeUI,
+      panelOpen: ui.panelOpen,
+      mini: { open: ui.miniOpen },
+      agentMeta: IDLE_META,
+      approvalResponder: null,
+      pendingPrefill: null,
+      pendingSelections: [],
+    });
+    reconcileActiveScope(get, set, nextScopeId);
+  },
+
+
+  patchDraft: (scopeId, patch) => {
+    const prev = get().scopeDrafts[scopeId] ?? {
+      value: "",
+      files: [],
+      pickedSnippets: [],
+      pickedCommands: [],
+    };
+    set({ scopeDrafts: { ...get().scopeDrafts, [scopeId]: { ...prev, ...patch } } });
+  },
+
   sessionsHydrated: false,
   sessions: [],
   activeSessionId: null,
@@ -311,45 +487,47 @@ export const useChatStore = create<StoreState>((set, get) => ({
     const { sessions } = await loadAll();
     if (get().sessionsHydrated) return;
 
-    // Reuse the most recent untitled "New chat" session if one exists from
-    // the previous run — no point stacking empty placeholder sessions every
-    // launch. Otherwise prepend a fresh one.
-    const reusable = sessions[0]?.title === "New chat" ? sessions[0] : null;
-    let nextSessions: SessionMeta[];
-    let freshId: string;
-    if (reusable) {
-      nextSessions = sessions;
-      freshId = reusable.id;
-    } else {
-      freshId = newSessionId();
-      const fresh: SessionMeta = {
-        id: freshId,
-        title: "New chat",
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      nextSessions = [fresh, ...sessions];
-      void saveSessionsList(nextSessions);
+    // Load the persisted list, but never overwrite a session the store
+    // already created: setActiveScope can run before this async hydrate
+    // lands (App's tab effect is synchronous) and its fresh session would
+    // otherwise be dropped, leaving activeSessionId pointing at an id that
+    // no longer exists in the list.
+    const existing = new Set(get().sessions.map((x) => x.id));
+    const merged = [...get().sessions, ...sessions.filter((x) => !existing.has(x.id))];
+
+    // A no-placeholder load: every session belongs to a scope, and the
+    // first tab's setActiveScope (which adopts legacy scopeless rows) picks
+    // or creates the right one.
+    set({ sessions: merged, sessionsHydrated: true });
+
+    // The scope may already be active (set before hydration): the early
+    // return in setActiveScope would skip adoption of legacy rows and the
+    // remembered-session restore, so re-run the reconcile explicitly. It
+    // keeps a session already created for this scope.
+    const scopeId = get().activeScopeId;
+    if (scopeId !== null) {
+      reconcileActiveScope(get, set, scopeId);
     }
-    void saveActiveId(freshId);
-
-    set({
-      sessions: nextSessions,
-      activeSessionId: freshId,
-      sessionsHydrated: true,
-    });
   },
-
   newSession: () => {
     const id = newSessionId();
+    const scopeId = get().activeScopeId ?? "";
     const meta: SessionMeta = {
       id,
       title: "New chat",
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      scopeId,
     };
     const next = [meta, ...get().sessions];
-    set({ sessions: next, activeSessionId: id, agentMeta: IDLE_META });
+    set((s) => ({
+      sessions: next,
+      activeSessionId: id,
+      agentMeta: IDLE_META,
+      ...(scopeId !== "" && {
+        scopeSessions: { ...s.scopeSessions, [scopeId]: id },
+      }),
+    }));
     void saveSessionsList(next);
     void saveActiveId(id);
     return id;
@@ -357,12 +535,30 @@ export const useChatStore = create<StoreState>((set, get) => ({
 
   switchSession: (id) => {
     if (get().activeSessionId === id) return;
-    if (!get().sessions.some((s) => s.id === id)) return;
+    const meta = get().sessions.find((s) => s.id === id);
+    if (!meta) return;
+    // A session belongs to one scope's chat; picking it from another scope's
+    // picker would cross projects.
+    const scopeId = get().activeScopeId;
+    if (scopeId !== null && meta.scopeId !== "" && meta.scopeId !== scopeId)
+      return;
 
     // Lazily seed the chat with persisted messages the first time we open
     // this session. Subsequent switches reuse the cached Chat instance.
     const flip = () => {
-      set({ activeSessionId: id, agentMeta: IDLE_META });
+      set((s) => ({
+        activeSessionId: id,
+        agentMeta: IDLE_META,
+        ...(scopeId !== null &&
+          meta.scopeId === "" && {
+            sessions: s.sessions.map((x) =>
+              x.id === id ? { ...x, scopeId } : x,
+            ),
+          }),
+        ...(scopeId !== null && {
+          scopeSessions: { ...s.scopeSessions, [scopeId]: id },
+        }),
+      }));
       void saveActiveId(id);
     };
     if (chats.has(id) || seedMessages.has(id)) {
@@ -371,6 +567,9 @@ export const useChatStore = create<StoreState>((set, get) => ({
     }
     void loadMessages(id)
       .then((m) => {
+        // The user may have switched scopes while the messages loaded; only
+        // flip when this session's scope is still the active one.
+        if (get().activeScopeId !== scopeId) return;
         if (m && m.length > 0 && !chats.has(id)) seedMessages.set(id, m);
         flip();
       })
@@ -385,6 +584,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   deleteSession: (id) => {
+    const scopeId = get().sessions.find((s) => s.id === id)?.scopeId ?? "";
     const remaining = get().sessions.filter((s) => s.id !== id);
     chats.get(id)?.stop();
     chats.delete(id);
@@ -398,22 +598,42 @@ export const useChatStore = create<StoreState>((set, get) => ({
     void deleteSessionData(id);
     void useTodosStore.getState().clearSession(id);
 
-    if (remaining.length === 0) {
+    const scopeSessions = { ...get().scopeSessions };
+    if (scopeSessions[scopeId] === id) delete scopeSessions[scopeId];
+
+    // Deleting the last session of a scope replaces it with a fresh one in
+    // that same scope; the user never lands in another project's chat.
+    if (remaining.filter((s) => s.scopeId === scopeId).length === 0) {
       const fresh: SessionMeta = {
         id: newSessionId(),
         title: "New chat",
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        scopeId,
       };
-      set({ sessions: [fresh], activeSessionId: fresh.id });
-      void saveSessionsList([fresh]);
+      set({
+        sessions: [fresh, ...remaining],
+        activeSessionId: fresh.id,
+        scopeSessions: { ...scopeSessions, [scopeId]: fresh.id },
+      });
+      void saveSessionsList([fresh, ...remaining]);
       void saveActiveId(fresh.id);
       return;
     }
 
     const wasActive = get().activeSessionId === id;
-    const nextActive = wasActive ? remaining[0].id : get().activeSessionId;
-    set({ sessions: remaining, activeSessionId: nextActive });
+    const sameScope = remaining.filter((s) => s.scopeId === scopeId);
+    const nextActive = wasActive
+      ? (sameScope[0]?.id ?? get().activeSessionId)
+      : get().activeSessionId;
+    if (wasActive && sameScope.length > 0) {
+      scopeSessions[scopeId] = sameScope[0].id;
+    }
+    set({
+      sessions: remaining,
+      activeSessionId: nextActive,
+      scopeSessions,
+    });
     void saveSessionsList(remaining);
     if (wasActive) void saveActiveId(nextActive);
   },

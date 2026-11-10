@@ -19,6 +19,7 @@ import {
   swapLeafInDirection,
 } from "@/modules/terminal/lib/panes";
 import { disposeSession } from "@/modules/terminal/lib/terminalSessionApi";
+import { createTabScopeId } from "./tabScope";
 import {
   type SetStateAction,
   useCallback,
@@ -32,6 +33,8 @@ export const MAX_PANES_PER_TAB = 4;
 
 type TabBase = {
   spaceId: string;
+  /** Stable per-tab identity for AI binding; survives restore, move, cwd. */
+  scopeId: string;
   /** Restored from disk, not yet activated: rendered as a placeholder, not mounted. */
   cold?: boolean;
 };
@@ -205,6 +208,7 @@ export function planMarkdownTabOpen(
         id: tabId,
         kind: "markdown",
         spaceId,
+        scopeId: createTabScopeId(),
         title: basename(path),
         path,
       },
@@ -244,6 +248,7 @@ export function planFileTabOpen(
           id: tabId,
           kind: "editor",
           spaceId,
+          scopeId: createTabScopeId(),
           title: basename(path),
           path,
           dirty: false,
@@ -280,6 +285,7 @@ export function planFileTabOpen(
     id: tabId,
     kind: "editor",
     spaceId,
+    scopeId: createTabScopeId(),
     title: basename(path),
     path,
     dirty: false,
@@ -487,6 +493,7 @@ export function planGitDiffOpen(
     id,
     kind: "git-diff",
     spaceId,
+    scopeId: createTabScopeId(),
     title,
     path: input.path,
     repoRoot: input.repoRoot,
@@ -541,6 +548,7 @@ export function planCommitHistoryOpen(
         id,
         kind: "git-history",
         spaceId,
+        scopeId: createTabScopeId(),
         title,
         repoRoot: input.repoRoot,
       } satisfies GitHistoryTab,
@@ -559,6 +567,7 @@ function coldTerminalTab(
     id: tabId,
     kind: "terminal",
     spaceId,
+    scopeId: createTabScopeId(),
     cold: true,
     title: cwd ? basename(cwd) : "shell",
     cwd,
@@ -608,6 +617,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         id: tabId,
         kind: "terminal",
         spaceId: DEFAULT_SPACE_ID,
+        scopeId: initial?.scopeId ?? createTabScopeId(),
         cold: true,
         title: initial?.title ?? "shell",
         cwd: initial?.cwd,
@@ -679,6 +689,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id: tabId,
           kind: "terminal",
           spaceId,
+          scopeId: createTabScopeId(),
           cold: true,
           title: cwd ? basename(cwd) : "shell",
           cwd,
@@ -779,6 +790,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id: tabId,
           kind: "terminal",
           spaceId: activeSpaceIdRef.current,
+          scopeId: createTabScopeId(),
           title: "shell",
           cwd,
           paneTree: { kind: "leaf", id: leafId, cwd },
@@ -801,6 +813,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id: tabId,
           kind: "terminal",
           spaceId: activeSpaceIdRef.current,
+          scopeId: createTabScopeId(),
           title: "blocks",
           cwd,
           paneTree: { kind: "leaf", id: leafId, cwd },
@@ -835,6 +848,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id: tabId,
           kind: "terminal",
           spaceId: activeSpaceIdRef.current,
+          scopeId: createTabScopeId(),
           title,
           customTitle: title,
           cwd,
@@ -866,6 +880,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id: tabId,
           kind: "terminal",
           spaceId: activeSpaceIdRef.current,
+          scopeId: createTabScopeId(),
           title: "private",
           cwd,
           paneTree: { kind: "leaf", id: leafId, cwd },
@@ -934,6 +949,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       proposedContent: string;
       approvalId: string;
       isNewFile: boolean;
+      /** Chat scope the approval belongs to (the tab that started the run). */
+      scopeId: string;
     }) => {
       let targetId: number | null = null;
       setTabs((curr) => {
@@ -953,6 +970,10 @@ export function useTabs(initial?: Partial<TerminalTab>) {
             id,
             kind: "ai-diff",
             spaceId: activeSpaceIdRef.current,
+            // Shares the approving run's chat scope: opening the diff keeps
+            // that scope's session (and approval responder) active instead
+            // of parking it for a scope with no session.
+            scopeId: input.scopeId,
             title,
             path: input.path,
             originalContent: input.originalContent,
@@ -1014,6 +1035,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id,
           kind: "preview",
           spaceId: activeSpaceIdRef.current,
+          scopeId: createTabScopeId(),
           title: titleFromUrl(url),
           url,
         },
@@ -1073,6 +1095,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
               id: t.id,
               kind: "markdown" as const,
               spaceId: t.spaceId,
+              scopeId: t.scopeId,
               cold: t.cold,
               title: t.title,
               path: t.path,
@@ -1166,6 +1189,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           id,
           kind: "git-commit-file",
           spaceId: activeSpaceIdRef.current,
+          scopeId: createTabScopeId(),
           title,
           repoRoot: input.repoRoot,
           sha: input.sha,
@@ -1480,6 +1504,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
             id: tabId,
             kind: "terminal",
             spaceId: activeSpaceIdRef.current,
+            scopeId: createTabScopeId(),
             title: "shell",
             cwd,
             paneTree: { kind: "leaf", id: leafId, cwd },

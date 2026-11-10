@@ -10,7 +10,7 @@ import {
 import type { Tab } from "@/modules/tabs";
 import type { Live } from "../store/chatStore";
 import { redactSensitive } from "./redact";
-
+import { scopeContextTerminal } from "./scopeContext";
 type TuiWaitResult = "ready" | "gone" | "timeout";
 
 async function waitForClaudeTuiReady(
@@ -30,6 +30,8 @@ async function waitForClaudeTuiReady(
 type Params = {
   setLive: (live: Live) => void;
   activeId: number;
+  /** Chat scope of the active tab; filters every context getter. */
+  activeScopeId: string | null;
   tabs: Tab[];
   explorerRoot: string | null;
   launchCwd: string | null;
@@ -58,43 +60,32 @@ export function useAiLiveBridge(params: Params) {
 
   useEffect(() => {
     const findCwd = () => {
-      const { activeId, tabs, explorerRoot, launchCwd, home } = ref.current;
-      const active = tabs.find((x) => x.id === activeId);
-      if (active?.kind === "terminal") {
-        return (
-          findLeafCwd(active.paneTree, active.activeLeafId) ??
-          active.cwd ??
-          null
-        );
-      }
-      for (let i = tabs.length - 1; i >= 0; i--) {
-        const t = tabs[i];
-        if (t.kind !== "terminal") continue;
-        const cwd = findLeafCwd(t.paneTree, t.activeLeafId) ?? t.cwd;
-        if (cwd) return cwd;
-      }
+      const { activeId, activeScopeId, tabs, explorerRoot, launchCwd, home } =
+        ref.current;
+      const t = scopeContextTerminal(tabs, activeId, activeScopeId);
+      if (t) return findLeafCwd(t.paneTree, t.activeLeafId) ?? t.cwd ?? null;
       return explorerRoot ?? launchCwd ?? home ?? null;
     };
 
     setLive({
       getCwd: findCwd,
       getTerminalContext: () => {
-        const { activeId, tabs } = ref.current;
-        const t = tabs.find((x) => x.id === activeId);
-        if (t?.kind !== "terminal") return null;
-        if (t.private) return null;
+        const { activeId, activeScopeId, tabs } = ref.current;
+        const t = scopeContextTerminal(tabs, activeId, activeScopeId);
+        if (!t || t.private) return null;
         const buf = terminalRefs.current.get(t.activeLeafId)?.getBuffer(300);
         return buf ? redactSensitive(buf) : null;
       },
       isActiveTerminalPrivate: () => {
-        const { activeId, tabs } = ref.current;
-        const t = tabs.find((x) => x.id === activeId);
-        return t?.kind === "terminal" && t.private === true;
+        const { activeId, activeScopeId, tabs } = ref.current;
+        return (
+          scopeContextTerminal(tabs, activeId, activeScopeId)?.private ?? false
+        );
       },
       injectIntoActivePty: (text) => {
-        const { activeId, tabs } = ref.current;
-        const t = tabs.find((x) => x.id === activeId);
-        if (t?.kind !== "terminal") return false;
+        const { activeId, activeScopeId, tabs } = ref.current;
+        const t = scopeContextTerminal(tabs, activeId, activeScopeId);
+        if (!t) return false;
         const term = terminalRefs.current.get(t.activeLeafId);
         if (!term) return false;
         term.write(text);
@@ -106,8 +97,10 @@ export function useAiLiveBridge(params: Params) {
         return explorerRoot ?? launchCwd ?? home ?? null;
       },
       getActiveFile: () => {
-        const { activeId, tabs } = ref.current;
-        const t = tabs.find((x) => x.id === activeId);
+        const { activeId, activeScopeId, tabs } = ref.current;
+        const t = tabs.find(
+          (x) => x.id === activeId && x.scopeId === activeScopeId,
+        );
         return t?.kind === "editor" ? t.path : null;
       },
       openPreview: (url: string) => {

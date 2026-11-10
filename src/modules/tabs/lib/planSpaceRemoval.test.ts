@@ -6,6 +6,7 @@ function term(id: number, spaceId: string): Tab {
     id,
     kind: "terminal",
     spaceId,
+    scopeId: `scope-${spaceId}-${id}`,
     title: "shell",
     paneTree: { kind: "leaf", id: id * 10 },
     activeLeafId: id * 10,

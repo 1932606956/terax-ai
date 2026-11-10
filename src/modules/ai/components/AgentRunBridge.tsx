@@ -40,7 +40,10 @@ export type AgentRunBridgeProps = {
 export function AgentRunBridge(props: AgentRunBridgeProps) {
   const sessionId = useChatStore((s) => s.activeSessionId);
   if (!sessionId) return null;
-  return <Bridge sessionId={sessionId} {...props} />;
+  // Keyed remount: a scope switch unmounts the outgoing session's bridge
+  // (its cleanup flushes durably) instead of re-pointing live effects at the
+  // new session with the old chat's message stream still in flight.
+  return <Bridge key={sessionId} sessionId={sessionId} {...props} />;
 }
 
 type BridgeProps = { sessionId: string } & AgentRunBridgeProps;
@@ -120,13 +123,10 @@ function Bridge({ sessionId, openAiDiffTab, closeAiDiffTab }: BridgeProps) {
 
   // ---- AI diff tab management ----------------------------------------------
   // We track which approvalIds have already opened a tab so re-renders don't
-  // open duplicates. Reset when the session changes.
+  // open duplicates. The Bridge remounts per session (keyed above), so the
+  // per-session reset comes from the fresh refs of a new mount.
   const openedRef = useRef<Set<string>>(new Set());
   const fileMutationFingerprintRef = useRef<string>("");
-  useEffect(() => {
-    openedRef.current = new Set();
-    fileMutationFingerprintRef.current = "";
-  }, [sessionId]);
 
   // Cheap fingerprint of file-mutation tool parts only. The diff-tab effect
   // is the most expensive thing on the streaming path, so we skip it when

@@ -468,14 +468,21 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
 function SessionPicker() {
   const sessions = useChatStore((s) => s.sessions);
   const activeId = useChatStore((s) => s.activeSessionId);
+  const activeScopeId = useChatStore((s) => s.activeScopeId);
   const switchSession = useChatStore((s) => s.switchSession);
   const newSession = useChatStore((s) => s.newSession);
   const deleteSession = useChatStore((s) => s.deleteSession);
 
-  const active = sessions.find((s) => s.id === activeId) ?? null;
+  // One chat scope per tab: the picker lists only this scope's sessions, so
+  // a project's conversations never surface in another project's chat.
+  const scoped =
+    activeScopeId === null
+      ? sessions
+      : sessions.filter((s) => s.scopeId === activeScopeId);
+  const active = scoped.find((s) => s.id === activeId) ?? null;
   if (!active) return null;
 
-  const sorted = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sorted = [...scoped].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
     <DropdownMenu>

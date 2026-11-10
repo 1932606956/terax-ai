@@ -10,6 +10,7 @@ function history(
     id,
     kind: "git-history",
     spaceId,
+    scopeId: `scope-${spaceId}-history-${id}`,
     title: "Git History",
     repoRoot,
   };

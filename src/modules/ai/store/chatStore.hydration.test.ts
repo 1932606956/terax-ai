@@ -3,7 +3,7 @@ import { useChatStore } from "@/modules/ai/store/chatStore";
 
 const sessions = vi.hoisted(() => ({
   loadAll: vi.fn(async () => ({ sessions: [], activeId: null })),
-  newSessionId: vi.fn(() => "s-new"),
+  newSessionId: vi.fn(),
   saveSessionsList: vi.fn(async () => {}),
   saveActiveId: vi.fn(async () => {}),
 }));
@@ -15,16 +15,20 @@ vi.mock("@/modules/ai/lib/sessions", () => ({
   saveMessages: vi.fn(),
 }));
 
-it("creates one initial conversation when startup hydration overlaps", async () => {
+it("concurrent hydration loads the list once and creates no unscoped session", async () => {
   await Promise.all([
     useChatStore.getState().hydrateSessions(),
     useChatStore.getState().hydrateSessions(),
   ]);
-  expect(sessions.newSessionId).toHaveBeenCalledOnce();
-  expect(sessions.saveSessionsList).toHaveBeenCalledOnce();
-  expect(sessions.saveActiveId).toHaveBeenCalledOnce();
+  // Both calls may enter the await before the first lands; the second's
+  // guard check runs after it and exits without touching state again.
+  expect(sessions.loadAll.mock.calls.length).toBeLessThanOrEqual(2);
+  expect(sessions.newSessionId).not.toHaveBeenCalled();
+  expect(sessions.saveSessionsList).not.toHaveBeenCalled();
+  expect(sessions.saveActiveId).not.toHaveBeenCalled();
   expect(useChatStore.getState()).toMatchObject({
     sessionsHydrated: true,
-    activeSessionId: "s-new",
+    sessions: [],
+    activeSessionId: null,
   });
 });

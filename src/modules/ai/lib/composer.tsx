@@ -62,6 +62,7 @@ type ProviderProps = {
 
 export function AiComposerProvider({ children }: ProviderProps) {
   const sessionId = useChatStore((s) => s.activeSessionId);
+  const scopeId = useChatStore((s) => s.activeScopeId);
   const status = useChatStore((s) => s.agentMeta.status);
   const isBusy = status === "thinking" || status === "streaming";
 
@@ -76,6 +77,26 @@ export function AiComposerProvider({ children }: ProviderProps) {
   const consumePrefill = useChatStore((s) => s.consumePrefill);
   const pendingSelections = useChatStore((s) => s.pendingSelections);
   const consumeSelections = useChatStore((s) => s.consumeSelections);
+  const patchDraft = useChatStore((s) => s.patchDraft);
+
+  // Drafts belong to a chat scope (one per tab). The store is the single
+  // source: an effect saves the outgoing draft on scope switch and restores
+  // the incoming one, so no store mutation happens during render and a
+  // half-typed prompt never leaks into another project's chat.
+  const draftRef = useRef({ value, files, pickedSnippets, pickedCommands });
+  draftRef.current = { value, files, pickedSnippets, pickedCommands };
+  const prevScopeRef = useRef(scopeId);
+  useEffect(() => {
+    if (prevScopeRef.current === scopeId) return;
+    const prev = prevScopeRef.current;
+    prevScopeRef.current = scopeId;
+    if (prev !== null) patchDraft(prev, draftRef.current);
+    const next = useChatStore.getState().scopeDrafts[scopeId ?? ""];
+    setValue(next?.value ?? "");
+    setFiles(next?.files ?? []);
+    setPickedSnippets(next?.pickedSnippets ?? []);
+    setPickedCommands(next?.pickedCommands ?? []);
+  }, [scopeId, patchDraft]);
 
   useEffect(() => {
     if (focusSignal === 0) return;
@@ -135,12 +156,18 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
   const addFiles = async (list: FileList | null) => {
     if (!list) return;
-    const next: FileAttachment[] = [];
+    const startedScope = useChatStore.getState().activeScopeId;
+    const attachments: FileAttachment[] = [];
     for (const f of Array.from(list)) {
       const att = await readAttachment(f);
-      if (att) next.push(att);
+      if (att) attachments.push(att);
     }
-    if (next.length) setFiles((prev) => [...prev, ...next]);
+    // The read awaited; a scope switch meanwhile would land these chips in
+    // another project's draft.
+    if (useChatStore.getState().activeScopeId !== startedScope) return;
+    if (attachments.length) {
+      setFiles((prev) => [...prev, ...attachments]);
+    }
   };
 
   const removeFile = (id: string) =>
@@ -161,6 +188,9 @@ export function AiComposerProvider({ children }: ProviderProps) {
     setPickedCommands((prev) => prev.filter((c) => c.name !== name));
 
   const attachFileByPath = async (path: string) => {
+    // Read from the store, not the render closure: the window-listener
+    // wrapper below keeps this function's captures frozen at mount.
+    const startedScope = useChatStore.getState().activeScopeId;
     try {
       type ReadResult =
         | { kind: "text"; content: string; size: number }
@@ -176,6 +206,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
         console.warn("attachFileByPath: skipped non-text file", path, result);
         return;
       }
+      if (useChatStore.getState().activeScopeId !== startedScope) return;
       const name = path.split("/").pop() || path;
       const id = `path-${path}`;
       setFiles((prev) => {
@@ -289,10 +320,17 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
     if (!sessionId) return;
     const store = useChatStore.getState();
+    const startedScopeId = store.activeScopeId;
     store.patchAgentMeta({ hitStepCap: false, compactionNotice: null });
     if (!store.mini.open) store.openMini();
     void (async () => {
+      // Dynamic import by design: keeps the AI SDK runtime out of the
+      // startup graph (see modules/ai/index.ts).
       const { getOrCreateChat } = await import("../store/chatRuntime");
+      // The import awaited: if the user switched tabs (scopes) in that
+      // window, this prompt belongs to the old scope's chat, not the one
+      // now active under a different project.
+      if (useChatStore.getState().activeScopeId !== startedScopeId) return;
       const chat = getOrCreateChat(sessionId);
       void chat.sendMessage({ role: "user", parts } as Parameters<
         typeof chat.sendMessage

@@ -9,6 +9,8 @@ export type SessionMeta = {
   title: string;
   createdAt: number;
   updatedAt: number;
+  /** Owning chat scope (one per top-level tab); "" only in legacy data. */
+  scopeId: string;
 };
 
 const STORE_PATH = "terax-ai-sessions.json";
@@ -223,7 +225,11 @@ export async function loadAll(): Promise<LoadedSessions> {
     store.get<SessionMeta[]>(KEY_SESSIONS),
     store.get<string>(KEY_ACTIVE),
   ]);
-  return { sessions: sessions ?? [], activeId: activeId ?? null };
+  // Legacy lists predate scope isolation; "" marks them for adoption by the
+  // first scope the user activates.
+  const adopted =
+    sessions?.map((s) => ({ ...s, scopeId: s.scopeId ?? "" })) ?? [];
+  return { sessions: adopted, activeId: activeId ?? null };
 }
 
 /**
