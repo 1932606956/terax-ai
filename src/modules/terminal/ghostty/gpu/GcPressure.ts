@@ -1,5 +1,7 @@
 /**
- * Makes JavaScriptCore see the native cost of the WebGPU wrappers a presented frame creates.
+ * Makes JavaScriptCore see the native cost of the WebGPU wrappers a presented
+ * frame creates. Only WebKit needs this (`mirrorsGcPressure`): Blink accounts
+ * for its own native allocations, so the mirror is inert in the Windows webview.
  *
  * Every window frame creates a canvas texture, its view, a command encoder, a render pass and a
  * command buffer wrapper. WebKit pins about 13 KiB of malloc per frame behind them until the
@@ -166,4 +168,39 @@ export function gcPressureOptionsFromStorage(): GcPressureOptions {
   } catch {
     return {};
   }
+}
+
+type EngineIdentity = { readonly vendor?: string; readonly userAgent?: string };
+
+/**
+ * Whether the WebGPU wrappers of this engine leak the way the mirror
+ * compensates for. The mirror exists because JavaScriptCore does not account
+ * for the WebKit malloc pinned behind a presented frame (see above). Blink
+ * tracks its own native allocations, so the same volume there is pure garbage:
+ * on Windows the mirror only added allocation and young-generation work to a
+ * webview that already holds more memory per tab.
+ */
+export function mirrorsGcPressure(
+  engine: EngineIdentity | undefined = typeof navigator === "undefined"
+    ? undefined
+    : navigator,
+): boolean {
+  const userAgent = engine?.userAgent ?? "";
+  if (!/AppleWebKit/.test(userAgent)) return false;
+  // Every Chromium build says AppleWebKit for compatibility.
+  return !/Chrome|Chromium|Edg\//.test(userAgent);
+}
+
+/**
+ * The mirror's options for this engine: the stored experiment override when
+ * there is one, and inert everywhere the leak it compensates for cannot
+ * happen.
+ */
+export function gcPressureOptionsForEngine(
+  engine?: EngineIdentity,
+  read: () => GcPressureOptions = gcPressureOptionsFromStorage,
+): GcPressureOptions {
+  const stored = read();
+  if (stored.bytesPerFrame !== undefined) return stored;
+  return mirrorsGcPressure(engine) ? stored : { ...stored, bytesPerFrame: 0 };
 }

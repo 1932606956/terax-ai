@@ -136,6 +136,13 @@ export interface GhosttyTerminalModelApi extends TerminalModel {
   renderCells(): TerminalCellReader;
   presentationSuppressed(): boolean;
   deferPresentation(): boolean;
+  /**
+   * Notified when the terminal modes change, whether or not a frame is
+   * presented. Input routing depends on the alternate screen and the mouse
+   * modes, which a held frame must never make stale: `subscribeDamage` is the
+   * renderer's gate and deliberately withholds those changes.
+   */
+  subscribeModes?(listener: () => void): () => void;
   /** App lab only: a resize erased the prompt and the shell has not printed it again. */
   promptErased?(): boolean;
   releasePresentationResources(): void;

@@ -143,7 +143,8 @@ destroying a canvas per occlusion cycle +30 MiB/cycle; keeping it hidden 0. So:
   a frame's wrappers pin ~13 KiB of native memory JavaScriptCore does not count,
   so without this it collects them after minutes (~20 MiB/min for a streaming
   agent). Ten times the native cost keeps young-generation collections steady
-  with no measurable CPU change.
+  with no measurable CPU change. WebKit only: Blink counts its own native
+  allocations, so the mirror is inert in the Windows webview.
 - The WebGL fallback stays per pane (its canvases are garbage collected normally).
 
 ## Resizing

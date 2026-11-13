@@ -15,7 +15,7 @@ import { GlyphAtlas } from "./GlyphAtlas";
 import type { RasterBudget } from "./GlyphMap";
 import {
   GcPressureMirror,
-  gcPressureOptionsFromStorage,
+  gcPressureOptionsForEngine,
   type GcPressureStats,
 } from "./GcPressure";
 import { BACKGROUND_SHADER, GLYPH_SHADER } from "./shaders";
@@ -193,8 +193,11 @@ export class WebGpuTerminalRuntime {
   private windowsCreated = 0;
   private windowsDestroyed = 0;
   private windowsReused = 0;
+  // WebKit pins the native cost of a presented frame behind wrappers
+  // JavaScriptCore never sees; Blink accounts for its own, so the mirror is
+  // inert there (see `mirrorsGcPressure`).
   private readonly gcMirror = new GcPressureMirror(
-    gcPressureOptionsFromStorage(),
+    gcPressureOptionsForEngine(),
   );
   private readonly surfaces = new Set<WebGpuRuntimeSurface>();
   private dirtySurfaces = new Set<WebGpuRuntimeSurface>();

@@ -33,6 +33,7 @@ export class GhosttyBlockSession {
   private dirty = true;
   private requestFrame: (() => void) | null = null;
   private unsubscribeDamage: (() => void) | null = null;
+  private unsubscribeModes: (() => void) | null = null;
   private presentedSignature: BlockViewportSignature | null = null;
   private readonly viewportListeners = new Set<() => void>();
   private readonly contentListeners = new Set<() => void>();
@@ -52,6 +53,11 @@ export class GhosttyBlockSession {
     this.requestFrame = requestFrame;
     this.controller = new GhosttyBlocks(model);
     this.unsubscribeDamage = model.subscribeDamage(() => this.changed());
+    // The mode decides where keys and clicks go. A held frame (a prompt being
+    // redrawn, a synchronized update) withholds damage, so the modes need their
+    // own signal or a TUI starting inside one keeps receiving prompt input.
+    this.unsubscribeModes =
+      model.subscribeModes?.(() => this.changed()) ?? null;
     this.unsubscribePresentation = subscribeWindowPresentation((state) => {
       this.presented = state.visible;
       if (state.visible) this.changed();
@@ -66,6 +72,8 @@ export class GhosttyBlockSession {
     this.unsubscribePresentation = null;
     this.unsubscribeDamage?.();
     this.unsubscribeDamage = null;
+    this.unsubscribeModes?.();
+    this.unsubscribeModes = null;
     this.controller?.dispose();
     this.controller = null;
     this.model = null;

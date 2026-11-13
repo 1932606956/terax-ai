@@ -1041,7 +1041,10 @@ function createHarness() {
   });
   vi.stubGlobal("GPUBufferUsage", { STORAGE: 1, COPY_DST: 2 });
   const requestDevice = vi.fn(async () => device);
+  // The app's WebKit engine: the one the GC mirror was measured on.
   vi.stubGlobal("navigator", {
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
     gpu: {
       requestAdapter: vi.fn(async () => ({
         requestDevice,

@@ -5,7 +5,9 @@ import {
   GC_MIRROR_MAX_BYTES_PER_SECOND,
   allocateMirrorBuffer,
   GcPressureMirror,
+  gcPressureOptionsForEngine,
   gcPressureOptionsFromStorage,
+  mirrorsGcPressure,
   NATIVE_BYTES_PER_FRAME,
 } from "./GcPressure";
 
@@ -226,5 +228,35 @@ describe("gcPressureOptionsFromStorage", () => {
       batchBytes: undefined,
     });
     expect(read(new Error("blocked"))).toEqual({});
+  });
+});
+
+describe("engine gating", () => {
+  const WEBKIT_UA =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+  const BLINK_UA =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0";
+
+  it("mirrors only where the engine leaks the native cost", () => {
+    expect(mirrorsGcPressure({ userAgent: WEBKIT_UA })).toBe(true);
+    expect(mirrorsGcPressure({ userAgent: BLINK_UA })).toBe(false);
+    expect(mirrorsGcPressure({})).toBe(false);
+  });
+
+  it("keeps the mirror inert on an engine that accounts for its own allocations", () => {
+    const read = () => ({});
+    expect(
+      gcPressureOptionsForEngine({ userAgent: BLINK_UA }, read).bytesPerFrame,
+    ).toBe(0);
+    expect(
+      gcPressureOptionsForEngine({ userAgent: WEBKIT_UA }, read).bytesPerFrame,
+    ).toBeUndefined();
+  });
+
+  it("still honors an explicit experiment override on any engine", () => {
+    const read = () => ({ bytesPerFrame: 20_000 });
+    expect(
+      gcPressureOptionsForEngine({ userAgent: BLINK_UA }, read).bytesPerFrame,
+    ).toBe(20_000);
   });
 });

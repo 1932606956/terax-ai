@@ -95,6 +95,14 @@ export class AdaptedGhosttyTerminalModel implements GhosttyTerminalModelApi {
   private blockMatch: { line: number; col: number; len: number } | null = null;
   private readonly directCellReader = new GhosttyRenderCellView();
   private readonly damageListeners = new Set<() => void>();
+  /**
+   * Called whenever the terminal mode bits change (alternate screen, mouse
+   * tracking, bracketed paste, focus reporting, synchronized output), even
+   * while presentation is held. Input routing reads the modes on every event,
+   * so a program that takes the alternate screen inside a held prompt must
+   * still be told: the damage gate deliberately withholds frames, not facts.
+   */
+  private readonly modeListeners = new Set<() => void>();
   private replySink: ((bytes: Uint8Array) => void) | null;
   private eventSink: ((event: GhosttyTerminalEvent) => void) | null;
   private onDispose: (() => void) | null;
@@ -754,6 +762,7 @@ export class AdaptedGhosttyTerminalModel implements GhosttyTerminalModelApi {
     if (modeBits === this.modeBitsValue) return;
     this.modeBitsValue = modeBits;
     this.modesValue = modesFromBits(modeBits);
+    for (const listener of this.modeListeners) listener();
   }
 
   readText(maxLines: number): string {
@@ -771,6 +780,12 @@ export class AdaptedGhosttyTerminalModel implements GhosttyTerminalModelApi {
     this.assertLive();
     this.damageListeners.add(listener);
     return () => this.damageListeners.delete(listener);
+  }
+
+  subscribeModes(listener: () => void): () => void {
+    this.assertLive();
+    this.modeListeners.add(listener);
+    return () => this.modeListeners.delete(listener);
   }
 
   setReplySink(sink: ((bytes: Uint8Array) => void) | null): void {
@@ -802,6 +817,7 @@ export class AdaptedGhosttyTerminalModel implements GhosttyTerminalModelApi {
     if (this.disposed) return;
     this.disposed = true;
     this.damageListeners.clear();
+    this.modeListeners.clear();
     this.replySink = null;
     this.eventSink = null;
     this.renderState = null;

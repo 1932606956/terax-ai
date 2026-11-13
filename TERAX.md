@@ -78,6 +78,10 @@ dropping a 126 KiB `ArrayBuffer` per frame (ten times the native cost; measured:
 unfinalized canvas textures after 120 s 2,626 without, 195 with it, no change in
 instructions per second) makes young-generation collections run steadily. At most
 4 MiB a second is mirrored, so display-rate frames allocate no more than a 25 fps agent.
+The mirror is WebKit-only (`mirrorsGcPressure`): Blink counts its own native
+allocations, so on Windows the same volume is pure garbage. The
+`localStorage["terax:terminal-gc-mirror"]` override still wins on any engine, so
+the measurement can be repeated where it was made.
 Resizing applies one synchronized model + PTY resize per gesture. Every SIGWINCH
 makes zsh/fish and Ink-based agents redraw, and redraws that do not line up with a
 reflowed grid leave duplicates in scrollback, so during a resize gesture (native
