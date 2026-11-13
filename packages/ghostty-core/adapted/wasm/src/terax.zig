@@ -4,6 +4,32 @@ const terminfo_responses = @import("ghostty-terminfo-responses");
 
 pub const std_options: std.Options = ghostty.std_options;
 
+
+extern "env" fn terax_monotonic_millis() u64;
+
+const host_io_vtable: std.Io.VTable = vtable: {
+    var vtable = std.Io.failing.vtable.*;
+    vtable.now = hostNow;
+    vtable.clockResolution = hostClockResolution;
+    // Futexes stay as `std.Io.failing`. A WASM instance is single-threaded,
+    // so Kitty's generation mutex never contends and never waits.
+    break :vtable vtable;
+};
+
+const host_io: std.Io = .{
+    .userdata = null,
+    .vtable = &host_io_vtable,
+};
+
+fn hostNow(_: ?*anyopaque, clock: std.Io.Clock) std.Io.Timestamp {
+    _ = clock;
+    return .{ .nanoseconds = terax_monotonic_millis() * std.time.ns_per_ms };
+}
+
+fn hostClockResolution(_: ?*anyopaque, _: std.Io.Clock) std.Io.Clock.ResolutionError!std.Io.Duration {
+    return .{ .nanoseconds = std.time.ns_per_ms };
+}
+
 const Allocator = std.mem.Allocator;
 
 const ErrorCode = enum(u32) {
@@ -271,6 +297,8 @@ const CursorVisualStyle = @TypeOf(ghostty.RenderState.empty.cursor.visual_style)
 const StreamAction = ghostty.StreamAction;
 const VtHandlerFn = @TypeOf(ghostty.Terminal.vtHandler);
 const ReadonlyHandler = @typeInfo(VtHandlerFn).@"fn".return_type.?;
+/// Ghostty disables Kitty graphics on freestanding targets because they have
+/// no clock. wasm32-wasi can host a monotonic clock, so the feature is on.
 const kitty_graphics_enabled = @hasDecl(ghostty.kitty.graphics, "Command");
 const max_output_bytes: usize = 256 * 1024;
 const max_retained_output_bytes: usize = 16 * 1024;
@@ -286,8 +314,13 @@ const render_state_reset_interval: u32 = 100_000;
 
 const log = std.log.scoped(.restty_apc);
 
+/// One visible placement. Pixel data is borrowed from the image and is valid
+/// only until the next mutating WASM call. `generation` changes whenever the
+/// same image id is replaced, including an equal-size retransmission.
 const KittyPlacementAbi = extern struct {
     image_id: u32,
+    image_generation_lo: u32,
+    image_generation_hi: u32,
     image_format: u8,
     _pad0: [3]u8 = .{ 0, 0, 0 },
     image_width: u32,
@@ -299,15 +332,10 @@ const KittyPlacementAbi = extern struct {
     z: i32,
     width: u32,
     height: u32,
-    cell_offset_x: u32,
-    cell_offset_y: u32,
     source_x: u32,
     source_y: u32,
     source_width: u32,
     source_height: u32,
-    placement_id: u32,
-    placement_external: u8,
-    _pad1: [3]u8 = .{ 0, 0, 0 },
 };
 
 const StreamHandler = struct {
@@ -395,15 +423,15 @@ const StreamHandler = struct {
         self.apc_debug_truncated = false;
     }
 
-    fn apcDebugCapture(self: *StreamHandler, byte: u8) void {
-        if (self.apc_debug_truncated) return;
-        if (self.apc_debug.items.len >= max_apc_debug_bytes) {
+    fn apcDebugCapture(self: *StreamHandler, bytes: []const u8) void {
+        if (self.apc_debug_truncated or bytes.len == 0) return;
+        const room = max_apc_debug_bytes - self.apc_debug.items.len;
+        const take = @min(room, bytes.len);
+        self.apc_debug.appendSlice(self.alloc, bytes[0..take]) catch {
             self.apc_debug_truncated = true;
             return;
-        }
-        self.apc_debug.append(self.alloc, byte) catch {
-            self.apc_debug_truncated = true;
         };
+        if (take < bytes.len) self.apc_debug_truncated = true;
     }
 
     fn isBase64Byte(byte: u8) bool {
@@ -796,7 +824,12 @@ const StreamHandler = struct {
         try self.appendOutput(resp);
     }
 
-    fn apcEnd(self: *StreamHandler) !void {
+    fn apcEnd(self: *StreamHandler, terminated: bool) !void {
+        if (!terminated) {
+            _ = self.apc.end();
+            self.apcDebugReset();
+            return;
+        }
         var cmd = self.apc.end() orelse {
             self.logApcFailure();
             self.apcDebugReset();
@@ -804,12 +837,11 @@ const StreamHandler = struct {
         };
         defer self.apcDebugReset();
         defer cmd.deinit(self.alloc);
-
         if (comptime !kitty_graphics_enabled) return;
 
         switch (cmd) {
             .kitty => |*kitty_cmd| {
-                if (self.term.kittyGraphics(self.alloc, kitty_cmd)) |resp| {
+                if (self.term.kittyGraphics(self.term.io(), self.alloc, kitty_cmd)) |resp| {
                     if (!resp.ok()) {
                         self.logKittyResponseError(kitty_cmd, resp);
                     }
@@ -820,6 +852,7 @@ const StreamHandler = struct {
                 }
             },
             .glyph => {},
+            .unknown => {},
         }
     }
 
@@ -927,10 +960,14 @@ const StreamHandler = struct {
                 self.apcDebugReset();
             },
             .apc_put => {
-                self.apcDebugCapture(value);
+                self.apcDebugCapture(&.{value});
                 self.apc.feed(self.alloc, value);
             },
-            .apc_end => try self.apcEnd(),
+            .apc_put_slice => {
+                self.apcDebugCapture(value.bytes);
+                self.apc.feedSlice(self.alloc, value.bytes);
+            },
+            .apc_end => try self.apcEnd(value.terminated),
             else => self.readonly.vt(action, value),
         }
     }
@@ -1598,23 +1635,55 @@ fn scrollToSelectedSearchMatch(h: *Restty) void {
     h.search.viewport_dirty = true;
 }
 
-fn kittyFormatToAbi(format: anytype) u8 {
+fn kittyFormatToAbi(format: @FieldType(ghostty.kitty.graphics.Image, "format")) u8 {
     return switch (format) {
         .gray => 1,
         .gray_alpha => 2,
         .rgb => 3,
         .rgba => 4,
-        .png => 100,
+        // PNG is decoded to RGBA before an image is stored.
+        .png => 4,
+    };
+}
+
+const ViewportPoint = struct {
+    col: i32,
+    row: i32,
+    visible: bool,
+};
+
+/// Viewport cell of a pin, plus signed cell offsets. A placement that only
+/// hangs off one edge stays visible; one that has left the viewport does not.
+fn viewportPoint(
+    h: *Restty,
+    pin: *ghostty.PageList.Pin,
+    col_offset: i32,
+    row_offset: i32,
+    cols: u32,
+    rows: u32,
+) ?ViewportPoint {
+    if (pin.garbage) return null;
+    const pages = &h.term.screens.active.pages;
+    const pin_screen = pages.pointFromPin(.screen, pin.*) orelse return null;
+    const viewport = pages.getTopLeft(.viewport);
+    const viewport_screen = pages.pointFromPin(.screen, viewport) orelse return null;
+    const col: i32 = @as(i32, @intCast(pin_screen.screen.x)) +| col_offset;
+    const row: i32 = (@as(i32, @intCast(pin_screen.screen.y)) -|
+        @as(i32, @intCast(viewport_screen.screen.y))) +| row_offset;
+    const right: i64 = @as(i64, col) + @as(i64, cols);
+    const bottom: i64 = @as(i64, row) + @as(i64, rows);
+    return .{
+        .col = col,
+        .row = row,
+        .visible = bottom > 0 and row < h.term.rows and right > 0 and col < h.term.cols,
     };
 }
 
 fn appendKittyPlacement(
     h: *Restty,
     image: ghostty.kitty.graphics.Image,
-    placement_id: u32,
-    placement_external: u8,
-    x: i32,
-    y: i32,
+    x_cells: i32,
+    y_cells: i32,
     z: i32,
     width: u32,
     height: u32,
@@ -1625,125 +1694,210 @@ fn appendKittyPlacement(
     source_width: u32,
     source_height: u32,
 ) !void {
-    const data_ptr: u32 = if (image.data.len == 0) 0 else @intCast(@intFromPtr(image.data.ptr));
-    const data_len: u32 = @intCast(image.data.len);
+    if (width == 0 or height == 0 or source_width == 0 or source_height == 0) return;
+    const pixels = image.renderData().bytes() orelse return;
+    const cell_width: u32 = h.term.width_px / h.term.cols;
+    const cell_height: u32 = h.term.height_px / h.term.rows;
+    const x: i64 = @as(i64, x_cells) * @as(i64, cell_width) + @as(i64, cell_offset_x);
+    const y: i64 = @as(i64, y_cells) * @as(i64, cell_height) + @as(i64, cell_offset_y);
+    if (x > std.math.maxInt(i32) or x < std.math.minInt(i32)) return;
+    if (y > std.math.maxInt(i32) or y < std.math.minInt(i32)) return;
 
     try h.kitty_placements.append(h.alloc, .{
         .image_id = image.id,
+        .image_generation_lo = @truncate(image.generation),
+        .image_generation_hi = @truncate(image.generation >> 32),
         .image_format = kittyFormatToAbi(image.format),
         .image_width = image.width,
         .image_height = image.height,
-        .image_data_ptr = data_ptr,
-        .image_data_len = data_len,
-        .x = x,
-        .y = y,
+        .image_data_ptr = @intCast(@intFromPtr(pixels.ptr)),
+        .image_data_len = @intCast(pixels.len),
+        .x = @intCast(x),
+        .y = @intCast(y),
         .z = z,
         .width = width,
         .height = height,
-        .cell_offset_x = cell_offset_x,
-        .cell_offset_y = cell_offset_y,
         .source_x = source_x,
         .source_y = source_y,
         .source_width = source_width,
         .source_height = source_height,
-        .placement_id = placement_id,
-        .placement_external = placement_external,
     });
 }
+
+const PendingRelative = struct {
+    image_id: u32,
+    placement: ghostty.kitty.graphics.ImageStorage.Placement,
+    root_key: ghostty.kitty.graphics.ImageStorage.PlacementKey,
+    horizontal_offset: i32,
+    vertical_offset: i32,
+};
+
+const VirtualOrigin = struct {
+    x: u32,
+    y: u32,
+};
 
 fn collectKittyPlacements(h: *Restty) !void {
     h.kitty_placements.clearRetainingCapacity();
     if (comptime !kitty_graphics_enabled) return;
+    if (h.term.cols == 0 or h.term.rows == 0) return;
+    if (h.term.width_px < h.term.cols or h.term.height_px < h.term.rows) return;
 
     const storage = &h.term.screens.active.kitty_images;
-    if (!storage.enabled()) return;
+    // No image, or an image with no placement, cannot draw anything. Bail out
+    // before touching pages so image-free terminals pay nothing per frame.
+    if (storage.images.count() == 0 or storage.placements.count() == 0) return;
 
     const pages = &h.term.screens.active.pages;
     const top = pages.getTopLeft(.viewport);
     const bot = pages.getBottomRight(.viewport) orelse return;
-    const top_screen = pages.pointFromPin(.screen, top) orelse return;
-    const bot_screen = pages.pointFromPin(.screen, bot) orelse return;
-    const top_y: u32 = top_screen.screen.y;
-    const bot_y: u32 = bot_screen.screen.y;
+
+    var pending_relative: std.ArrayListUnmanaged(PendingRelative) = .empty;
+    defer pending_relative.deinit(h.alloc);
 
     var it = storage.placements.iterator();
     while (it.next()) |entry| {
-        const p = entry.value_ptr;
-        switch (p.location) {
-            .pin => {},
+        const placement = entry.value_ptr;
+        const origin = switch (placement.location) {
+            .pin => |pin| .{ pin, @as(i32, 0), @as(i32, 0) },
             .virtual => continue,
-        }
+            .relative => |relative| chain: {
+                const resolved = storage.resolveChain(relative) orelse continue;
+                switch (resolved.root.location) {
+                    .pin => |pin| break :chain .{
+                        pin,
+                        resolved.horizontal_offset,
+                        resolved.vertical_offset,
+                    },
+                    .virtual => {
+                        try pending_relative.append(h.alloc, .{
+                            .image_id = entry.key_ptr.image_id,
+                            .placement = placement.*,
+                            .root_key = resolved.root_key,
+                            .horizontal_offset = resolved.horizontal_offset,
+                            .vertical_offset = resolved.vertical_offset,
+                        });
+                        continue;
+                    },
+                    .relative => unreachable,
+                }
+            },
+        };
 
         const image = storage.imageById(entry.key_ptr.image_id) orelse continue;
-        const rect = p.rect(image, &h.term) orelse continue;
-        const img_top = pages.pointFromPin(.screen, rect.top_left) orelse continue;
-        const img_bot = pages.pointFromPin(.screen, rect.bottom_right) orelse continue;
-        const img_top_y: u32 = img_top.screen.y;
-        const img_bot_y: u32 = img_bot.screen.y;
-        if (img_top_y > bot_y or img_bot_y < top_y) continue;
+        const grid = placement.gridSize(image, &h.term);
+        if (grid.cols == 0 or grid.rows == 0) continue;
+        const point = viewportPoint(
+            h,
+            origin[0],
+            origin[1],
+            origin[2],
+            grid.cols,
+            grid.rows,
+        ) orelse continue;
+        if (!point.visible) continue;
 
-        const dest_size = p.pixelSize(image, &h.term);
-        if (dest_size.width == 0 or dest_size.height == 0) continue;
-
-        const source_x: u32 = @min(image.width, p.source_x);
-        const source_y: u32 = @min(image.height, p.source_y);
-        const source_width: u32 = if (p.source_width > 0)
-            @min(image.width - source_x, p.source_width)
-        else
-            image.width;
-        const source_height: u32 = if (p.source_height > 0)
-            @min(image.height - source_y, p.source_height)
-        else
-            image.height;
-        if (source_width == 0 or source_height == 0) continue;
-
-        const y_pos: i32 = @as(i32, @intCast(img_top_y)) - @as(i32, @intCast(top_y));
+        const dest = placement.pixelSize(image, &h.term);
+        const offset = placement.cellOffset(&h.term);
+        const source = placement.sourceRect(image);
         try appendKittyPlacement(
             h,
             image,
-            entry.key_ptr.placement_id.id,
-            @intFromBool(entry.key_ptr.placement_id.tag == .external),
-            @intCast(rect.top_left.x),
-            y_pos,
-            p.z,
-            dest_size.width,
-            dest_size.height,
-            p.x_offset,
-            p.y_offset,
-            source_x,
-            source_y,
-            source_width,
-            source_height,
+            point.col,
+            point.row,
+            placement.z,
+            dest.width,
+            dest.height,
+            offset.x,
+            offset.y,
+            source.x,
+            source.y,
+            source.width,
+            source.height,
         );
     }
 
-    const cell_width: u32 = if (h.term.cols > 0) @max(1, h.term.width_px / h.term.cols) else 0;
-    const cell_height: u32 = if (h.term.rows > 0) @max(1, h.term.height_px / h.term.rows) else 0;
+    const cell_width: u32 = h.term.width_px / h.term.cols;
+    const cell_height: u32 = h.term.height_px / h.term.rows;
     if (cell_width == 0 or cell_height == 0) return;
 
-    var v_it = ghostty.kitty.graphics.unicode.placementIterator(top, bot);
-    while (v_it.next()) |virtual_p| {
-        const image = storage.imageById(virtual_p.image_id) orelse continue;
-        const rp = virtual_p.renderPlacement(storage, &image, cell_width, cell_height) catch continue;
-        if (rp.dest_width == 0 or rp.dest_height == 0) continue;
-        const viewport = pages.pointFromPin(.viewport, rp.top_left) orelse continue;
+    var origins: std.AutoHashMapUnmanaged(
+        ghostty.kitty.graphics.ImageStorage.PlacementKey,
+        VirtualOrigin,
+    ) = .empty;
+    defer origins.deinit(h.alloc);
 
+    var virtual_it = ghostty.kitty.graphics.unicode.placementIterator(top, bot);
+    while (virtual_it.next()) |virtual_placement| {
+        const image = storage.imageById(virtual_placement.image_id) orelse continue;
+        const rendered = virtual_placement.renderPlacement(
+            storage,
+            &image,
+            cell_width,
+            cell_height,
+        ) catch continue;
+        const viewport = pages.pointFromPin(.viewport, rendered.top_left) orelse continue;
         try appendKittyPlacement(
             h,
             image,
-            virtual_p.placement_id,
-            if (virtual_p.placement_id == 0) 0 else 1,
-            @intCast(rp.top_left.x),
+            @intCast(viewport.viewport.x),
             @intCast(viewport.viewport.y),
             -1,
-            rp.dest_width,
-            rp.dest_height,
-            rp.offset_x,
-            rp.offset_y,
-            rp.source_x,
-            rp.source_y,
-            rp.source_width,
-            rp.source_height,
+            rendered.dest_width,
+            rendered.dest_height,
+            rendered.offset_x,
+            rendered.offset_y,
+            rendered.source_x,
+            rendered.source_y,
+            rendered.source_width,
+            rendered.source_height,
+        );
+
+        if (pending_relative.items.len == 0) continue;
+        const target = storage.placeholderTarget(
+            virtual_placement.image_id,
+            virtual_placement.placement_id,
+        ) orelse continue;
+        const found = try origins.getOrPut(h.alloc, target.key);
+        if (!found.found_existing) {
+            found.value_ptr.* = .{
+                .x = viewport.viewport.x,
+                .y = viewport.viewport.y,
+            };
+        } else {
+            found.value_ptr.x = @min(found.value_ptr.x, viewport.viewport.x);
+            found.value_ptr.y = @min(found.value_ptr.y, viewport.viewport.y);
+        }
+    }
+
+    for (pending_relative.items) |pending| {
+        const origin = origins.get(pending.root_key) orelse continue;
+        const image = storage.imageById(pending.image_id) orelse continue;
+        const grid = pending.placement.gridSize(image, &h.term);
+        if (grid.cols == 0 or grid.rows == 0) continue;
+        const x: i64 = @as(i64, origin.x) + pending.horizontal_offset;
+        const y: i64 = @as(i64, origin.y) + pending.vertical_offset;
+        if (y >= h.term.rows or y + grid.rows - 1 < 0) continue;
+        if (x >= h.term.cols or x + grid.cols - 1 < 0) continue;
+        const column = std.math.cast(i32, x) orelse continue;
+        const row = std.math.cast(i32, y) orelse continue;
+        const dest = pending.placement.pixelSize(image, &h.term);
+        const offset = pending.placement.cellOffset(&h.term);
+        const source = pending.placement.sourceRect(image);
+        try appendKittyPlacement(
+            h,
+            image,
+            column,
+            row,
+            pending.placement.z,
+            dest.width,
+            dest.height,
+            offset.x,
+            offset.y,
+            source.x,
+            source.y,
+            source.width,
+            source.height,
         );
     }
 
@@ -1752,19 +1906,44 @@ fn collectKittyPlacements(h: *Restty) !void {
         h.kitty_placements.items,
         {},
         struct {
-            fn lessThan(ctx: void, lhs: KittyPlacementAbi, rhs: KittyPlacementAbi) bool {
-                _ = ctx;
+            fn lessThan(_: void, lhs: KittyPlacementAbi, rhs: KittyPlacementAbi) bool {
                 if (lhs.z != rhs.z) return lhs.z < rhs.z;
                 if (lhs.image_id != rhs.image_id) return lhs.image_id < rhs.image_id;
-                if (lhs.placement_external != rhs.placement_external) {
-                    return lhs.placement_external < rhs.placement_external;
-                }
-                if (lhs.placement_id != rhs.placement_id) return lhs.placement_id < rhs.placement_id;
                 if (lhs.y != rhs.y) return lhs.y < rhs.y;
                 return lhs.x < rhs.x;
             }
         }.lessThan,
     );
+}
+
+const kitty_storage_limit: usize = 10 * 1000 * 1000;
+
+fn pngPixelBytes(data: []const u8) ?usize {
+    if (data.len < 24) return null;
+    if (!std.mem.eql(u8, data[0..8], "\x89PNG\r\n\x1a\n")) return null;
+    if (!std.mem.eql(u8, data[12..16], "IHDR")) return null;
+    const width = std.mem.readInt(u32, data[16..20], .big);
+    const height = std.mem.readInt(u32, data[20..24], .big);
+    const pixels = std.math.mul(usize, width, height) catch return kitty_storage_limit + 1;
+    return std.math.mul(usize, pixels, 4) catch kitty_storage_limit + 1;
+}
+
+fn decodeKittyPng(alloc: Allocator, data: []const u8) ghostty.sys.DecodeError!ghostty.sys.Image {
+    if (pngPixelBytes(data)) |bytes| {
+        if (bytes > kitty_storage_limit) return error.InvalidData;
+    }
+    const wuffs = @import("wuffs");
+    const decoded = wuffs.png.decode(alloc, data) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.WuffsError, error.Overflow => return error.InvalidData,
+    };
+    errdefer alloc.free(decoded.data);
+    if (decoded.data.len > kitty_storage_limit) return error.InvalidData;
+    return .{
+        .width = decoded.width,
+        .height = decoded.height,
+        .data = decoded.data,
+    };
 }
 
 pub export fn restty_create(cols: u16, rows: u16, max_scrollback: u32) ?*Restty {
@@ -1794,7 +1973,7 @@ fn createWithLimits(
     colors.foreground = ghostty.color.DynamicRGB.init(.{ .r = 0xFF, .g = 0xFF, .b = 0xFF });
     colors.cursor = ghostty.color.DynamicRGB.init(.{ .r = 0xFF, .g = 0xFF, .b = 0xFF });
 
-    var term = ghostty.Terminal.init(ghostty.TinyIo.init.io(), alloc, .{
+    var term = ghostty.Terminal.init(host_io, alloc, .{
         .cols = cols,
         .rows = rows,
         .max_scrollback_bytes = max_scrollback_bytes,
@@ -1803,6 +1982,13 @@ fn createWithLimits(
     }) catch return null;
     term.width_px = cols;
     term.height_px = rows;
+    if (comptime kitty_graphics_enabled) {
+        // The library default is 10 MB per screen. File, temporary-file and
+        // shared-memory loads stay off: this host has no filesystem.
+        term.setKittyGraphicsSizeLimit(alloc, 10 * 1000 * 1000);
+        term.setKittyGraphicsLoadingLimits(.direct);
+        ghostty.sys.decode_png = &decodeKittyPng;
+    }
 
     const handle = alloc.create(Restty) catch {
         term.deinit(alloc);

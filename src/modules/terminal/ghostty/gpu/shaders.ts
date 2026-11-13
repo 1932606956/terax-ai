@@ -153,23 +153,6 @@ fn cell_background(index: u32, row: u32, col: u32) -> vec3f {
   }
   return background;
 }
-`;
-
-export const BACKGROUND_SHADER = /* wgsl */ `
-${COMMON}
-
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-}
-
-@vertex
-fn vertex_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
-  let corners = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
-  var output: VertexOutput;
-  output.position = vec4f(corners[vertex_index], 0.0, 1.0);
-  return output;
-}
-
 fn decoration_color(
   record: vec4u,
   background: vec3f,
@@ -211,6 +194,23 @@ fn decoration_color(
   if (underline_style == 5u && fract(unit_x * 2.0) > 0.68) { return background; }
   return underline_color;
 }
+`;
+
+export const BACKGROUND_SHADER = /* wgsl */ `
+${COMMON}
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+}
+
+@vertex
+fn vertex_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+  let corners = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var output: VertexOutput;
+  output.position = vec4f(corners[vertex_index], 0.0, 1.0);
+  return output;
+}
+
 
 @fragment
 fn fragment_main(@builtin(position) position: vec4f) -> @location(0) vec4f {
@@ -415,5 +415,87 @@ fn fragment_main(
   let coverage = textureLoad(coverage_texture, texel, 0).r;
   if ((glyph_flags & 2u) != 0u) { return vec4f(color.rgb, color.a * coverage); }
   return vec4f(color.rgb, color.a * apply_contrast(coverage, color.rgb));
+}
+`;
+
+export const KITTY_IMAGE_SHADER = /* wgsl */ `
+${COMMON}
+
+struct ImagePlacement {
+  destination: vec4f,
+  source: vec4f,
+  depth: vec4f,
+}
+@group(1) @binding(0) var<storage, read> images: array<ImagePlacement>;
+@group(1) @binding(1) var image_texture: texture_2d<f32>;
+
+struct ImageVertex {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+  @interpolate(flat) @location(1) index: u32,
+}
+
+@vertex
+fn image_vertex(
+  @builtin(vertex_index) vertex: u32,
+  @builtin(instance_index) instance: u32,
+) -> ImageVertex {
+  let p = images[instance];
+  let corners = array<vec2f, 6>(
+    vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0),
+    vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0),
+  );
+  let corner = corners[vertex];
+  let pixel = p.destination.xy + corner * p.destination.zw -
+    vec2f(0.0, f32(screen.shift_y)) - vec2f(screen.clip);
+  var output: ImageVertex;
+  output.position = vec4f(
+    pixel.x / screen.viewport_size.x * 2.0 - 1.0,
+    1.0 - pixel.y / screen.viewport_size.y * 2.0, 0.0, 1.0,
+  );
+  output.uv = corner;
+  output.index = instance;
+  return output;
+}
+
+@fragment
+fn image_fragment(input: ImageVertex) -> @location(0) vec4f {
+  let p = images[input.index];
+  let position = input.position.xy - vec2f(screen.origin) +
+    vec2f(0.0, f32(screen.shift_y));
+  let cell = vec2u(position) / screen.cell_size;
+  if (position.x < 0.0 || position.y < 0.0 ||
+      cell.x >= screen.dims.x || cell.y >= screen.dims.y) { discard; }
+  var selected = false;
+  if (p.depth.x < 0.0) {
+    let index = cell.y * screen.dims.x + cell.x;
+    let record = cells[index];
+    let background = cell_background(index, cell.y, cell.x);
+    if (p.depth.x < -1.0 &&
+        any(unpack4x8unorm(record.z).rgb != screen.theme_background.rgb)) { discard; }
+    var local = vec2u(position) - cell * screen.cell_size;
+    var span_width = screen.cell_size.x;
+    if (is_wide_lead(record)) { span_width = span_width * 2u; }
+    else if (is_spacer_tail(index, cell.x)) {
+      local.x = local.x + screen.cell_size.x;
+      span_width = span_width * 2u;
+    }
+    if (any(decoration_color(record, background, local, span_width) != background)) { discard; }
+    var cursor_min = screen.cursor_origin;
+    var cursor_max = screen.cursor_origin + screen.cursor_size;
+    if ((screen.flags & FLAG_CURSOR_BLOCK) != 0u && cell.y == cursor_cell().y) {
+      let span = cursor_columns(cursor_cell());
+      cursor_min.x = f32(span.x * screen.cell_size.x);
+      cursor_max.x = f32((span.x + span.y) * screen.cell_size.x);
+    }
+    if (all(position >= cursor_min) && all(position < cursor_max)) { discard; }
+    selected = selection_contains(i32(cell.y), i32(cell.x));
+  }
+  let source = p.source.xy + input.uv * p.source.zw;
+  let dimensions = vec2i(textureDimensions(image_texture));
+  let texel = clamp(vec2i(floor(source)), vec2i(0), dimensions - vec2i(1));
+  var color = textureLoad(image_texture, texel, 0);
+  if (selected) { color = vec4f(mix(color.rgb, screen.selection_color.rgb, screen.selection_color.a), color.a); }
+  return color;
 }
 `;

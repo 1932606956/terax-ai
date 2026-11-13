@@ -4,7 +4,10 @@ import type {
   TerminalModel,
   TerminalRowRange,
 } from "@/modules/terminal/backend/contracts";
-import type { TeraxGhosttyGpuGlyph } from "@terax/ghostty-core/adapted";
+import type {
+  TeraxGhosttyGpuGlyph,
+  TeraxGhosttyKittyPlacement,
+} from "@terax/ghostty-core/adapted";
 import type {
   GhosttyTerminalConfig,
   GhosttyTerminalEvent,
@@ -134,6 +137,8 @@ export interface GhosttyTerminalModelApi extends TerminalModel {
    */
   consumeGpuFrame(options?: GhosttyGpuFrameOptions): GhosttyGpuFrame;
   renderCells(): TerminalCellReader;
+  /** Borrows decoded image pixels from the current render state. */
+  kittyPlacements(): readonly TeraxGhosttyKittyPlacement[];
   presentationSuppressed(): boolean;
   deferPresentation(): boolean;
   /**

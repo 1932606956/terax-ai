@@ -27,6 +27,7 @@ import {
   type TerminalSelectionBounds,
 } from "../selection/TerminalSelectionController";
 import { WebGlGlyphAtlas, type WebGlGlyphEntry } from "./WebGlGlyphAtlas";
+import { WebGlKittyImages } from "./WebGlKittyImages";
 
 const GLYPH_FLOATS = 15;
 const GLYPH_POSITION_OFFSET = 13;
@@ -82,6 +83,10 @@ type Program = {
   readonly projection: WebGLUniformLocation;
 };
 
+type ColorProgram = Program & {
+  readonly decorationsOnly: WebGLUniformLocation;
+};
+
 type GlyphProgram = Program & {
   readonly resolution: WebGLUniformLocation;
   readonly atlas: WebGLUniformLocation;
@@ -101,7 +106,7 @@ type RectangleVertices = {
 };
 
 type RendererResources = {
-  readonly colorProgram: Program;
+  readonly colorProgram: ColorProgram;
   readonly glyphProgram: GlyphProgram;
   readonly backgroundVao: WebGLVertexArrayObject;
   readonly cursorVao: WebGLVertexArrayObject;
@@ -163,7 +168,7 @@ export class WebGlCellRenderer {
   private forceFullRedraw = true;
   private contextLost = false;
   private viewportDirty = true;
-  private contextRestoreTimer: number | null = null;
+  private contextRestoreTimer: ReturnType<typeof setTimeout> | null = null;
   private frameCount = 0;
   private uploadCount = 0;
   private uploadedGlyphBytes = 0;
@@ -171,6 +176,8 @@ export class WebGlCellRenderer {
   private backingStoreResizeCount = 0;
   private blinkingRowCount = 0;
   private disposed = false;
+  private kittyImages: WebGlKittyImages | null = null;
+  private kittyChanged = false;
   private onContextRestored: (() => void) | null = null;
   private onContextFailure: ((error: Error) => void) | null = null;
 
@@ -189,6 +196,7 @@ export class WebGlCellRenderer {
     });
     if (!context) throw new Error("WebGL2 is unavailable in this webview");
     this.gl = context;
+    this.kittyImages = new WebGlKittyImages(context);
     this.resources = this.createResources();
     this.canvas.addEventListener("webglcontextlost", this.handleContextLost);
     this.canvas.addEventListener(
@@ -282,10 +290,12 @@ export class WebGlCellRenderer {
     if (backingStoreChanged) this.backingStoreResizeCount += 1;
     if (backingStoreChanged || this.viewportDirty) {
       this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      this.gl.disable(this.gl.SCISSOR_TEST);
       this.viewportDirty = false;
       this.forceFullRedraw = true;
     }
 
+    this.syncKittyImages(frame);
     const damage = this.forceFullRedraw
       ? { kind: "full" as const }
       : frame.damage;
@@ -303,9 +313,9 @@ export class WebGlCellRenderer {
       return false;
     this.draw(frame.textBlinkVisible);
     this.forcePresent = false;
+    this.kittyChanged = false;
     this.lastTextBlinkVisible = frame.textBlinkVisible;
     this.forceFullRedraw = false;
-    this.frameCount += 1;
     return true;
   }
 
@@ -327,6 +337,8 @@ export class WebGlCellRenderer {
     this.blinkingRows.fill(0, 0, this.rows);
     this.blinkingRowCount = 0;
     this.glyphInstanceCount = 0;
+    this.kittyImages?.reset();
+    this.kittyChanged = false;
   }
 
   diagnostics(): WebGlCellRendererStats {
@@ -353,9 +365,12 @@ export class WebGlCellRenderer {
         this.rectangleDirtyRows.byteLength +
         this.rectangleScratch.attributes.byteLength +
         this.cursorVertices.attributes.byteLength +
-        this.uploadedCursor.byteLength,
+        this.uploadedCursor.byteLength +
+        (this.kittyImages?.stats().cpuBytes ?? 0),
       gpuBufferBytes:
-        this.glyphGpuCapacity * GLYPH_FLOATS * 4 + this.backgroundGpuBytes,
+        this.glyphGpuCapacity * GLYPH_FLOATS * 4 +
+        this.backgroundGpuBytes +
+        (this.kittyImages?.stats().gpuBytes ?? 0),
       canvasColorBytes: this.disposed
         ? 0
         : this.canvas.width * this.canvas.height * 4,
@@ -383,6 +398,8 @@ export class WebGlCellRenderer {
     this.canvas.remove();
     this.atlas?.dispose();
     this.atlas = null;
+    this.kittyImages?.dispose();
+    this.kittyImages = null;
     this.deleteResources();
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
     this.canvas.width = 1;
@@ -410,8 +427,10 @@ export class WebGlCellRenderer {
   private readonly handleContextLost = (event: Event): void => {
     event.preventDefault();
     this.contextLost = true;
+    this.kittyImages?.abandon();
+    this.kittyChanged = false;
     this.clearContextRestoreTimer();
-    this.contextRestoreTimer = window.setTimeout(() => {
+    this.contextRestoreTimer = setTimeout(() => {
       this.contextRestoreTimer = null;
       this.onContextFailure?.(
         new Error("WebGL context was not restored within 3 seconds"),
@@ -424,6 +443,8 @@ export class WebGlCellRenderer {
     this.clearContextRestoreTimer();
     this.contextLost = false;
     this.atlas = null;
+    this.kittyImages = new WebGlKittyImages(this.gl);
+    this.kittyChanged = false;
     this.glyphGpuCapacity = 0;
     this.backgroundGpuBytes = 0;
     this.resources = this.createResources();
@@ -743,6 +764,7 @@ export class WebGlCellRenderer {
           1,
           runColor,
           1,
+          -1,
         );
       }
       runStart = column;
@@ -932,17 +954,33 @@ export class WebGlCellRenderer {
       1,
     );
     gl.clear(gl.COLOR_BUFFER_BIT);
+    const gridWidth = this.cols * profile.metrics.deviceCellWidth;
+    const gridHeight = this.rows * profile.metrics.deviceCellHeight;
+    this.gl.enable(this.gl.SCISSOR_TEST);
+    this.gl.scissor(0, this.canvas.height - gridHeight, gridWidth, gridHeight);
+    this.kittyImages?.draw("below-cells", gridWidth, gridHeight);
 
     gl.disable(gl.BLEND);
     this.drawRectangles(
       resources.colorProgram,
       resources.backgroundVao,
       this.backgroundVertices.count,
+      false,
     );
+    if (this.kittyImages?.hasLayer("below-text")) {
+      this.kittyImages.draw("below-text", gridWidth, gridHeight);
+      this.drawRectangles(
+        resources.colorProgram,
+        resources.backgroundVao,
+        this.backgroundVertices.count,
+        true,
+      );
+    }
     this.drawRectangles(
       resources.colorProgram,
       resources.cursorVao,
       this.cursorVertices.count,
+      false,
     );
 
     gl.enable(gl.BLEND);
@@ -1004,12 +1042,33 @@ export class WebGlCellRenderer {
       0,
       this.glyphInstanceCount,
     );
+    this.kittyImages?.draw("above-text", gridWidth, gridHeight);
+    this.gl.disable(this.gl.SCISSOR_TEST);
+  }
+
+  private syncKittyImages(frame: WebGlRendererFrame): void {
+    const images = this.kittyImages;
+    const profile = this.profile;
+    if (!images || !profile || this.cols < 1 || this.rows < 1) return;
+    const placements =
+      frame.model.kittyPlacements?.() ?? EMPTY_KITTY_PLACEMENTS;
+    if (
+      images.sync(
+        placements,
+        this.cols * profile.metrics.deviceCellWidth,
+        this.rows * profile.metrics.deviceCellHeight,
+      )
+    ) {
+      this.kittyChanged = true;
+    }
+    if (this.kittyChanged) this.forcePresent = true;
   }
 
   private drawRectangles(
-    program: Program,
+    program: ColorProgram,
     vao: WebGLVertexArrayObject,
     count: number,
+    decorationsOnly: boolean,
   ): void {
     if (count === 0) return;
     const gl = this.gl;
@@ -1017,6 +1076,7 @@ export class WebGlCellRenderer {
     gl.useProgram(program.value);
     gl.bindVertexArray(vao);
     gl.uniformMatrix4fv(program.projection, false, PROJECTION_MATRIX);
+    gl.uniform1i(program.decorationsOnly, decorationsOnly ? 1 : 0);
     gl.drawElementsInstanced(gl.TRIANGLE_STRIP, 4, gl.UNSIGNED_BYTE, 0, count);
   }
 
@@ -1130,6 +1190,11 @@ export class WebGlCellRenderer {
       colorProgramValue,
       "u_projection",
     );
+    const colorDecorationsOnly = requiredUniform(
+      gl,
+      colorProgramValue,
+      "u_decorations_only",
+    );
     const glyphProjection = requiredUniform(
       gl,
       glyphProgramValue,
@@ -1206,6 +1271,7 @@ export class WebGlCellRenderer {
       colorProgram: {
         value: colorProgramValue,
         projection: colorProjection,
+        decorationsOnly: colorDecorationsOnly,
       },
       glyphProgram: {
         value: glyphProgramValue,
@@ -1251,7 +1317,7 @@ export class WebGlCellRenderer {
 
   private clearContextRestoreTimer(): void {
     if (this.contextRestoreTimer !== null) {
-      window.clearTimeout(this.contextRestoreTimer);
+      clearTimeout(this.contextRestoreTimer);
     }
     this.contextRestoreTimer = null;
   }
@@ -1536,8 +1602,10 @@ precision highp float;
 in vec4 v_color;
 in vec2 v_unitquad;
 flat in float v_decoration;
+uniform bool u_decorations_only;
 out vec4 outColor;
 void main() {
+  if (u_decorations_only && v_decoration < 0.0) discard;
   int style = int(v_decoration + 0.5);
   if (style == 2 && v_unitquad.y > 0.28 && v_unitquad.y < 0.72) discard;
   if (style == 3) {
@@ -1627,3 +1695,5 @@ void main() {
     outColor = vec4(rgb, alpha * coverage);
   }
 }`;
+
+const EMPTY_KITTY_PLACEMENTS: readonly [] = [];

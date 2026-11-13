@@ -1,4 +1,3 @@
-import type { ViewportLinkSource } from "@/modules/terminal/ghostty/core/ViewportLinkResolver";
 import type {
   PackedTerminalViewport,
   TerminalCursor,
@@ -7,9 +6,11 @@ import type {
   TerminalModes,
   TerminalRowRange,
 } from "@/modules/terminal/backend/contracts";
+import type { ViewportLinkSource } from "@/modules/terminal/ghostty/core/ViewportLinkResolver";
 import type {
   TeraxGhostty,
   TeraxGhosttyGpuRenderState,
+  TeraxGhosttyKittyPlacement,
   TeraxGhosttyRenderBase,
   TeraxGhosttyRenderState,
   TeraxGhosttyTerminal,
@@ -21,12 +22,12 @@ import type {
 } from "@terax/ghostty-core/protocol";
 import { CellFlags } from "@terax/ghostty-core/protocol";
 import { PromptPresentationGate } from "./core/PromptPresentationGate";
-import { ResizePromptHold } from "./core/ResizePromptHold";
 import {
   CELL_STRIDE,
   type Rgb,
   type TerminalCellReader,
 } from "./core/packedCells";
+import { ResizePromptHold } from "./core/ResizePromptHold";
 import { SynchronizedOutputPresentationGate } from "./core/SynchronizedOutputPresentationGate";
 import {
   MIN_SCROLLBACK_BYTES,
@@ -470,6 +471,12 @@ export class AdaptedGhosttyTerminalModel implements GhosttyTerminalModelApi {
     this.assertLive();
     this.directCellReader.update(this.ensureRenderState());
     return this.directCellReader;
+  }
+
+  kittyPlacements(): readonly TeraxGhosttyKittyPlacement[] {
+    this.assertLive();
+    this.ensureCurrentState();
+    return this.terminal.kittyPlacements();
   }
 
   cursor(): TerminalCursor {

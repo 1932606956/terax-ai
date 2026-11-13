@@ -244,6 +244,19 @@ the webview supports. Scalar validation explicitly disables SIMD instructions
 and types. This avoids changing OS minimums solely for the WASM SIMD requirement;
 actual older WKWebView and WebKitGTK compatibility still needs platform tests.
 
+Inline images (Kitty graphics protocol) are parsed and stored natively in the
+WASM instance: the artifacts target `wasm32-wasi` (ReleaseSafe) because upstream
+gates Kitty graphics on a working clock, and the bridge imports only a
+monotonic-millisecond host function while the WASI import surface is stubbed
+ENOSYS from JS. PNG payloads are decoded inside WASM (Wuffs, 10 MB per-screen
+and per-image budgets, direct transfers only); `kittyPlacements()` snapshots
+the visible placements (pin, virtual placeholder, and relative chains) and the
+renderers upload the borrowed pixels in the same frame. Both renderers draw the
+same z layers: below-cells (z below -2^30), below-text, and above-text
+(`gpu/WebGpuKittyImages.ts`, `webgl/WebGlKittyImages.ts`); textures are keyed
+by image id plus generation, so a same-size replacement re-uploads. Text cells
+holding the Unicode placeholder draw nothing under the image.
+
 PTY output is one multiplexed pull stream per window (`docs/architecture/pty-transport-v2.md`),
 not a channel per terminal. The async `terax-pty` URI scheme (`pty/protocol.rs`) has two POST
 endpoints: `poll`, kept outstanding exactly once per webview, and `ack`. One process-wide hub

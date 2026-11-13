@@ -10,11 +10,11 @@ per-terminal frame loop, or per-pane GPU lifecycle.
 - Restty source: `https://github.com/wiedymi/restty`
 - Restty commit: `7700b14a7643ba9240818209ef1e0aa90d83ad77`
 - Zig: `0.16.0`
-- Optimization: `ReleaseFast`, WebAssembly SIMD and scalar variants
-- SIMD artifact size: `755971` bytes
-- Scalar artifact size: `753894` bytes
-- SIMD SHA-256: `32b630675916b3122c2c187c640191e90ae848ee9f196ec5fe091681560c1f11`
-- Scalar SHA-256: `3749923e6d7c9ad8f1919f0072073843d9792dcd41d6628b42f208b1f733aa13`
+- Target: `wasm32-wasi`, `ReleaseSafe`, WebAssembly SIMD and scalar variants
+- SIMD artifact size: `1086864` bytes
+- Scalar artifact size: `1095833` bytes
+- SIMD SHA-256: `ee8612b6be413f301e26f73a974ad01c190bd6cfba984f625a87e1f83ea3abe8`
+- Scalar SHA-256: `f2ce138dd3a4da04091aac4526af956588208a0d945faebc17c32085a3da33db`
 
 Terax-specific changes include:
 
@@ -96,6 +96,51 @@ The bridge deliberately stays below Terax's model/surface boundary. Terax
 retains renderer pooling, hidden-tab renderer release, damage-driven frame
 scheduling, shell integration, semantic routing, and fallback selection.
 
+## Kitty graphics (wasm32-wasi)
+
+The artifacts target `wasm32-wasi` instead of `wasm32-freestanding` because
+upstream gates the Kitty graphics protocol on a working clock
+(`Options.kittyGraphics` returns false for freestanding targets). WASI gives
+the bridge a monotonic millisecond import (`env.terax_monotonic_millis`,
+`performance.now()`), which is the only host IO the terminal consumes: the
+WASI snapshot preview1 import surface is stubbed with `ENOSYS` on the JS side
+and the IO vtable stays `std.Io.failing` except for `now`/`clockResolution`.
+
+Kitty-specific bridge surface:
+
+- `restty_kitty_placement_stride/_count/_ptr` expose a snapshot of visible
+  image placements (68 bytes each: image id and generation, decoded pixel
+  format, width, height, borrowed device-pixel `data_ptr`/`data_len`, x/y/z
+  placement, source rect). Placement collection covers pin placements,
+  virtual (Unicode placeholder) placements, and relative placements resolved
+  through the storage chain.
+- PNG payloads are decoded inside WASM by Wuffs (`ghostty.sys.decode_png` is
+  redirected to the bridge decoder); direct transfers are limited to the same
+  10 MB per-screen budget as the previous default via
+  `restty_set_kitty_graphics_size_limit`-equivalent init
+  (`term.setKittyGraphicsSizeLimit(alloc, 10_000_000)` and direct-only
+  loading limits). Decoded RGBA storage is capped at 10,000,000 bytes per
+  image, matching the storage limit.
+- Pixel data is borrowed from the image and is valid only until the next
+  mutating WASM call; the TS layer (`kittyPlacements()`) snapshots placement
+  records and the renderer uploads borrowed pixels in the same frame.
+- Text cells containing the Unicode placeholder (U+10EEEE) suppress their
+  grapheme payload and draw nothing; the image draws over the placeholder.
+
+### Why ReleaseSafe (not ReleaseFast)
+
+The `wasm32-wasi` artifacts are built with `-Doptimize=ReleaseSafe`.
+A `ReleaseFast` WASI build miscompiles the page hyperlink machinery: after a
+page growth triggers full render damage, `hyperlink_set` lookups return the
+wrong URI for cells that keep a stable hyperlink (reproduced with a 40x4
+terminal, one persistent link, and ten growing links on another row; the
+cell re-interns the *other* row's URI). The freestanding builds and every
+`ReleaseSafe`/`Debug` build are correct, with kitty graphics enabled or
+disabled, with or without WASM SIMD. The failure is independent of the
+Terax bridge changes (HEAD bridge sources rebuild byte-identical freestanding
+artifacts and pass). Zig 0.16.0 was not upgraded; the safety-checked build
+ships instead. The soak suite runs against both artifacts and formats.
+
 ## October 15 instance-per-terminal memory
 
 A single shared instance can never give memory back: WebAssembly memory only
@@ -115,8 +160,8 @@ real WKWebView on macOS 26 (footprint of the WebContent process):
   external memory 186 MB to 49 MB (shared instance: 175 MB to 174 MB); WKWebView
   footprint 247 MB to 73 MB, and 26 MB after the last close.
 
-An idle WKWebView does not collect a dropped memory for many seconds, so the
-loader creates a one-page `WebAssembly.Memory` 250 ms after a burst of disposals;
+An idle WKWebView does not collect a dropped memory for many seconds, so
+the loader creates a one-page `WebAssembly.Memory` 250 ms after a burst of disposals;
 WebKit and V8 both collect when it is allocated (`reclaim` option). With the hint
 the footprint is back within about a second (212 MB after one second without it).
 `node scripts/ghostty-webkit-memory.mjs` repeats the WKWebView run.
@@ -192,9 +237,9 @@ From `packages/ghostty-core/adapted/wasm` (add `-Dwasm-stack-kib=N` to change th
 96 KiB shadow stack; `pnpm soak:ghostty` reports the deepest stack use):
 
 ```sh
-zig build -Dtarget=wasm32-freestanding -Doptimize=ReleaseFast
+zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
 cp zig-out/bin/terax-ghostty-vt.wasm ../ghostty-vt.wasm
-zig build -Dtarget=wasm32-freestanding -Doptimize=ReleaseFast -Dwasm-simd=false
+zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Dwasm-simd=false
 cp zig-out/bin/terax-ghostty-vt.wasm ../ghostty-vt-scalar.wasm
 shasum -a 256 ../ghostty-vt.wasm ../ghostty-vt-scalar.wasm
 ```

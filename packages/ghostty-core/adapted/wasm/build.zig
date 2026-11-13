@@ -38,6 +38,8 @@ pub fn build(b: *std.Build) void {
         // traps on an out-of-bounds access instead of corrupting data.
         const stack_kib = b.option(u32, "wasm-stack-kib", "WebAssembly shadow stack size in KiB") orelse 96;
         exe.stack_size = @as(u64, stack_kib) * 1024;
+        // wasm32-wasi pulls TinyIo's full filesystem vtable. The terminal
+        // stays freestanding; its one clock import is declared in terax.zig.
     }
 
     const ghostty_dep = b.dependency("ghostty", .{
@@ -71,6 +73,12 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addAnonymousImport("ghostty-terminfo-responses", .{
         .root_source_file = terminfo_output,
     });
+    if (ghostty_dep.builder.lazyDependency("wuffs", .{
+        .target = target,
+        .optimize = optimize,
+    })) |wuffs_dep| {
+        exe.root_module.addImport("wuffs", wuffs_dep.module("wuffs"));
+    }
 
     b.installArtifact(exe);
 }

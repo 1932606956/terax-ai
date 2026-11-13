@@ -1,5 +1,7 @@
 import type {
   TeraxGhosttyGpuRenderState,
+  TeraxGhosttyKittyImage,
+  TeraxGhosttyKittyPlacement,
   TeraxGhosttyLine,
   TeraxGhosttyLoadOptions,
   TeraxGhosttyKeyEvent,
@@ -27,10 +29,10 @@ export const ADAPTED_GHOSTTY_COMMIT =
 export const ADAPTED_RESTTY_COMMIT =
   "7700b14a7643ba9240818209ef1e0aa90d83ad77";
 export const ADAPTED_GHOSTTY_WASM_SHA256 =
-  "32b630675916b3122c2c187c640191e90ae848ee9f196ec5fe091681560c1f11";
+  "ee8612b6be413f301e26f73a974ad01c190bd6cfba984f625a87e1f83ea3abe8";
 
 export const ADAPTED_GHOSTTY_SCALAR_WASM_SHA256 =
-  "3749923e6d7c9ad8f1919f0072073843d9792dcd41d6628b42f208b1f733aa13";
+  "f2ce138dd3a4da04091aac4526af956588208a0d945faebc17c32085a3da33db";
 
 let wasmSimdAvailable: boolean | undefined;
 
@@ -61,6 +63,7 @@ const CURSOR_BYTES = 16;
 const EVENT_HEADER_BYTES = 5;
 const SEARCH_STATUS_BYTES = 16;
 const SEARCH_VIEWPORT_SPAN_BYTES = 8;
+const KITTY_PLACEMENT_BYTES = 68;
 const MAX_EVENT_PAYLOAD_BYTES = 256 * 1024;
 const LINE_CHUNK_LINES = 64;
 const RECLAIM_DELAY_MS = 250;
@@ -175,10 +178,14 @@ const requiredExports = [
   "restty_line_cells_ptr",
   "restty_line_cells_len",
   "restty_line_cells_release",
+  "restty_kitty_placement_stride",
+  "restty_kitty_placement_count",
+  "restty_kitty_placements_ptr",
 ] as const;
 
 const textDecoder = new TextDecoder();
 const emptyBytes = new Uint8Array(0);
+const emptyKittyPlacements: readonly TeraxGhosttyKittyPlacement[] = [];
 const emptyUint32 = new Uint32Array(0);
 const emptyEvents: GhosttyTerminalEvent[] = [];
 
@@ -207,6 +214,7 @@ type RenderViewCache = {
   readonly gpuCellWords: ViewCacheEntry<Uint32Array>;
   readonly gpuNewGlyphs: ViewCacheEntry<Uint32Array>;
   readonly gpuAllGlyphs: ViewCacheEntry<Uint32Array>;
+  readonly kittyPlacements: ViewCacheEntry<Uint8Array>;
 };
 
 /**
@@ -454,6 +462,12 @@ export class TeraxGhosttyTerminal {
   private readonly textEncoder = new TextEncoder();
   private format: TeraxGhosttyRenderFormat = "soa";
   private disposed = false;
+  private kittySnapshot: {
+    buffer: ArrayBuffer;
+    revision: number;
+    placements: readonly TeraxGhosttyKittyPlacement[];
+  } | null = null;
+  private kittyRevision = 0;
 
   constructor(
     instance: TeraxGhosttyInstance,
@@ -553,6 +567,107 @@ export class TeraxGhosttyTerminal {
   }
 
   /**
+   * Visible Kitty placements from the latest render update. The array and its
+   * image objects are cached until the next update; image bytes are borrowed
+   * WASM memory and are recreated if that memory grows.
+   */
+  kittyPlacements(): readonly TeraxGhosttyKittyPlacement[] {
+    this.assertLive();
+    const buffer = this.memory.buffer;
+    if (
+      this.kittySnapshot?.buffer === buffer &&
+      this.kittySnapshot.revision === this.kittyRevision
+    ) {
+      const first = this.kittySnapshot.placements[0];
+      if (
+        !first ||
+        first.image.data.byteLength === 0 ||
+        first.image.data.buffer === buffer
+      ) {
+        return this.kittySnapshot.placements;
+      }
+    }
+    return this.readKittyPlacements();
+  }
+
+  private readKittyPlacements(): readonly TeraxGhosttyKittyPlacement[] {
+    const count = this.exports.restty_kitty_placement_count(this.handle);
+    if (count === 0) {
+      this.kittySnapshot = {
+        buffer: this.memory.buffer,
+        revision: this.kittyRevision,
+        placements: emptyKittyPlacements,
+      };
+      return emptyKittyPlacements;
+    }
+    const stride = this.exports.restty_kitty_placement_stride();
+    if (stride !== KITTY_PLACEMENT_BYTES) {
+      throw new Error(
+        `Adapted Ghostty Kitty placement stride is ${stride}, expected ${KITTY_PLACEMENT_BYTES}`,
+      );
+    }
+    const pointer = this.exports.restty_kitty_placements_ptr(this.handle);
+    const bytes = this.view(
+      this.cache.kittyPlacements,
+      pointer,
+      count * stride,
+      Uint8Array,
+    );
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const images = new Map<string, TeraxGhosttyKittyImage>();
+    const placements: TeraxGhosttyKittyPlacement[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const offset = index * stride;
+      const id = view.getUint32(offset, true);
+      const generation =
+        view.getUint32(offset + 4, true) +
+        view.getUint32(offset + 8, true) * 0x1_0000_0000;
+      const format = view.getUint8(offset + 12);
+      if (format !== 1 && format !== 2 && format !== 3 && format !== 4) {
+        throw new Error(`Adapted Ghostty Kitty image format ${format} is unsupported`);
+      }
+      const width = view.getUint32(offset + 16, true);
+      const height = view.getUint32(offset + 20, true);
+      const dataPointer = view.getUint32(offset + 24, true);
+      const dataLength = view.getUint32(offset + 28, true);
+      const key = `${id}:${generation}`;
+      let image = images.get(key);
+      if (!image) {
+        image = {
+          id,
+          generation,
+          width,
+          height,
+          format,
+          data:
+            dataLength === 0
+              ? emptyBytes
+              : new Uint8Array(bytes.buffer, dataPointer, dataLength),
+        };
+        images.set(key, image);
+      }
+      placements.push({
+        image,
+        x: view.getInt32(offset + 32, true),
+        y: view.getInt32(offset + 36, true),
+        z: view.getInt32(offset + 40, true),
+        width: view.getUint32(offset + 44, true),
+        height: view.getUint32(offset + 48, true),
+        sourceX: view.getUint32(offset + 52, true),
+        sourceY: view.getUint32(offset + 56, true),
+        sourceWidth: view.getUint32(offset + 60, true),
+        sourceHeight: view.getUint32(offset + 64, true),
+      });
+    }
+    this.kittySnapshot = {
+      buffer: this.memory.buffer,
+      revision: this.kittyRevision,
+      placements,
+    };
+    return placements;
+  }
+
+  /**
    * The linear memory this terminal lives in. `memory.buffer` is replaced (and
    * the old buffer detached) whenever the memory grows; read it again after any
    * call that can allocate. Do not retain it past `dispose()`.
@@ -623,6 +738,7 @@ export class TeraxGhosttyTerminal {
       this.exports.restty_render_update(this.handle),
       "update render state",
     );
+    this.kittyRevision += 1;
     return this.readRenderState();
   }
 
@@ -638,6 +754,7 @@ export class TeraxGhosttyTerminal {
       this.exports.restty_render_update(this.handle),
       "update GPU render state",
     );
+    this.kittyRevision += 1;
     return this.readGpuRenderState();
   }
 
@@ -1614,12 +1731,16 @@ function detachMemoryViews(memory: WebAssembly.Memory): void {
   }
 }
 
+
 function createImports(
   holder: MemoryHolder,
   options: TeraxGhosttyLoadOptions,
 ): WebAssembly.Imports {
+  const started = performance.now();
   return {
     env: {
+      terax_monotonic_millis: (): bigint =>
+        BigInt(Math.max(0, Math.floor(performance.now() - started))),
       log: (pointer: number, length: number) => {
         const memory = holder.current;
         if (!memory || pointer <= 0 || length <= 0) return;
@@ -1628,6 +1749,38 @@ function createImports(
           textDecoder.decode(new Uint8Array(memory.buffer, pointer, length)),
         );
       },
+    },
+    // Zig's WASI syscall table stays linked. None of these may succeed:
+    // file, directory, environment, entropy and process operations are
+    // unsupported. Kitty time goes through env.terax_monotonic_millis.
+    wasi_snapshot_preview1: {
+      clock_res_get: () => 52,
+      clock_time_get: () => 52,
+      environ_get: () => 52,
+      environ_sizes_get: () => 52,
+      fd_close: () => 52,
+      fd_fdstat_get: () => 52,
+      fd_filestat_get: () => 52,
+      fd_filestat_set_size: () => 52,
+      fd_filestat_set_times: () => 52,
+      fd_pread: () => 52,
+      fd_pwrite: () => 52,
+      fd_read: () => 52,
+      fd_readdir: () => 52,
+      fd_seek: () => 52,
+      fd_sync: () => 52,
+      fd_write: () => 52,
+      path_create_directory: () => 52,
+      path_filestat_get: () => 52,
+      path_link: () => 52,
+      path_open: () => 52,
+      path_readlink: () => 52,
+      path_remove_directory: () => 52,
+      path_rename: () => 52,
+      path_symlink: () => 52,
+      path_unlink_file: () => 52,
+      poll_oneoff: () => 52,
+      random_get: () => 52,
     },
   };
 }
@@ -1667,6 +1820,7 @@ function createRenderViewCache(): RenderViewCache {
     gpuCellWords: createViewCacheEntry(),
     gpuNewGlyphs: createViewCacheEntry(),
     gpuAllGlyphs: createViewCacheEntry(),
+    kittyPlacements: createViewCacheEntry(),
   };
 }
 

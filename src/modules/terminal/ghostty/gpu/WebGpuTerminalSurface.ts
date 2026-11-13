@@ -1,22 +1,25 @@
-import { terminalWindowFocused } from "@/modules/terminal/ghostty/renderScheduling";
-import { bindTerminalInteraction } from "@/modules/terminal/ghostty/input/terminalInteraction";
-import { isClampedScrollEcho, TerminalScrollbarSync } from "@/modules/terminal/ghostty/gpu/terminalScrollbar";
-import { terminalWindowPresentation } from "@/modules/terminal/ghostty/windowPresentation";
-import type { TerminalSurface } from "@/modules/terminal/backend/contracts";
 import { smoothHooks } from "@/bench/smoothHooks";
 import { isPrimaryModifierPressed } from "@/lib/platform";
+import type { TerminalSurface } from "@/modules/terminal/backend/contracts";
+import {
+  isClampedScrollEcho,
+  TerminalScrollbarSync,
+} from "@/modules/terminal/ghostty/gpu/terminalScrollbar";
+import { bindTerminalInteraction } from "@/modules/terminal/ghostty/input/terminalInteraction";
+import { terminalWindowFocused } from "@/modules/terminal/ghostty/renderScheduling";
+import { terminalWindowPresentation } from "@/modules/terminal/ghostty/windowPresentation";
 import { noteTerminalHostResize } from "@/modules/terminal/lib/terminalResizeGesture";
 import {
   subscribeTerminalResizeInteraction,
   terminalResizeInteractionActive,
 } from "@/modules/terminal/lib/terminalResizeInteraction";
 import { TerminalResizeSync } from "@/modules/terminal/lib/terminalResizeSync";
+import type { Rgb } from "../core/packedCells";
+import type { TerminalLinkHit } from "../core/terminalLinks";
 import {
   type DeferredTerminalLinks,
   deferTerminalLinks,
 } from "../core/terminalLinksLoader";
-import type { Rgb } from "../core/packedCells";
-import type { TerminalLinkHit } from "../core/terminalLinks";
 import type {
   GhosttyGpuFrame,
   GhosttyTerminalModelApi,
@@ -24,7 +27,7 @@ import type {
 import { GhosttySearchController } from "../search/GhosttySearchController";
 import { TerminalSelectionController } from "../selection/TerminalSelectionController";
 import { DevicePixelRatioMonitor } from "./DevicePixelRatioMonitor";
-import { TerminalGlyphMap, type RasterBudget } from "./GlyphMap";
+import { type RasterBudget, TerminalGlyphMap } from "./GlyphMap";
 import { type DeviceRect, deviceRectsEqual } from "./PaneRects";
 import { ScreenUniform, type ScreenUniformState } from "./ScreenUniform";
 import { SCREEN_UNIFORM_BYTES } from "./shaders";
@@ -33,8 +36,8 @@ import {
   TERMINAL_RIGHT_GUTTER_CSS_PX,
 } from "./TerminalFit";
 import {
-  TerminalFitQueue,
   type TerminalFitBounds,
+  TerminalFitQueue,
   type TerminalFitQueueDiagnostics,
 } from "./TerminalFitQueue";
 import {
@@ -60,6 +63,7 @@ import {
   nextWebGpuCellCapacity,
   packSearchMask,
 } from "./WebGpuCellBuffer";
+import { WebGpuKittyImages } from "./WebGpuKittyImages";
 import {
   createRasterBudget,
   FIRST_FRAME_RASTER_BUDGET_MS,
@@ -153,6 +157,7 @@ export class WebGpuTerminalSurface
   private glyphMapBuffer: GPUBuffer | null = null;
   private searchBuffer: GPUBuffer | null = null;
   private bindGroup: GPUBindGroup | null = null;
+  private kittyImages: WebGpuKittyImages | null = null;
   private bindGroupDirty = true;
   private readonly screen = new ScreenUniform();
   private searchScratch = new Uint8Array(0);
@@ -550,8 +555,10 @@ export class WebGpuTerminalSurface
     pass.setBindGroup(0, this.bindGroup);
     pass.setPipeline(resources.backgroundPipeline);
     pass.draw(3);
+    this.kittyImages?.draw(pass, false);
     pass.setPipeline(resources.glyphPipeline);
     pass.draw(6, this.drawCells);
+    this.kittyImages?.draw(pass, true);
   }
 
   handleCanvasRevealed(): void {
@@ -630,6 +637,16 @@ export class WebGpuTerminalSurface
       device,
     );
 
+    // Upload borrowed pixels before another native call can grow memory.
+    const placements = model.kittyPlacements?.();
+    if (placements?.length && !this.kittyImages) {
+      this.kittyImages = new WebGpuKittyImages(resources);
+    }
+    const imagesChanged =
+      placements && this.kittyImages
+        ? this.kittyImages.update(placements)
+        : false;
+
     const cursor = model.cursor();
     const viewportOrigin = model.viewportOriginLine();
     this.syncTextBlink();
@@ -646,6 +663,7 @@ export class WebGpuTerminalSurface
       frame.damage.kind !== "none" ||
       cellsUploaded ||
       glyphsChanged ||
+      imagesChanged ||
       searchChanged ||
       uniformChanged ||
       bindingsChanged ||
@@ -768,7 +786,8 @@ export class WebGpuTerminalSurface
       (this.cellsBuffer?.size ?? 0) +
       (this.uniformBuffer?.size ?? 0) +
       (this.glyphMapBuffer?.size ?? 0) +
-      (this.searchBuffer?.size ?? 0);
+      (this.searchBuffer?.size ?? 0) +
+      (this.kittyImages?.byteSize ?? 0);
     return {
       frames: this.frameCount,
       viewport: this.binding?.rect() ?? null,
@@ -780,7 +799,8 @@ export class WebGpuTerminalSurface
       cpuBufferBytes:
         this.screen.data.byteLength +
         this.glyphMap.byteSize +
-        this.searchScratch.byteLength,
+        this.searchScratch.byteLength +
+        (this.kittyImages?.cpuByteSize ?? 0),
       gpuBufferBytes: retainedBufferBytes,
       // The swapchain belongs to the window canvas; see the runtime's `canvases`.
       canvasColorBytes: 0,
@@ -924,6 +944,8 @@ export class WebGpuTerminalSurface
   }
 
   private releaseGpuResources(): void {
+    this.kittyImages?.dispose();
+    this.kittyImages = null;
     this.cellsBuffer?.destroy();
     this.uniformBuffer?.destroy();
     this.glyphMapBuffer?.destroy();
@@ -1332,7 +1354,9 @@ export class WebGpuTerminalSurface
     shiftY: number,
   ): void {
     const show =
-      this.cursorEnabled && this.nativeCursorVisible && cursor.visible !== false;
+      this.cursorEnabled &&
+      this.nativeCursorVisible &&
+      cursor.visible !== false;
     const x = show ? cursor.x * this.metrics.cellWidth : 0;
     const y = show
       ? cursor.y * this.metrics.cellHeight - shiftY / this.metrics.scale

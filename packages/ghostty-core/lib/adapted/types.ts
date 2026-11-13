@@ -161,6 +161,30 @@ export type TeraxGhosttySelection = {
   readonly focus: { readonly line: number; readonly column: number };
   readonly rectangular: boolean;
 };
+export type TeraxGhosttyKittyImageFormat = 1 | 2 | 3 | 4;
+
+export type TeraxGhosttyKittyImage = {
+  readonly id: number;
+  readonly generation: number;
+  readonly width: number;
+  readonly height: number;
+  readonly format: TeraxGhosttyKittyImageFormat;
+  /** Borrowed WASM memory, valid until the next mutating WASM call. */
+  readonly data: Uint8Array;
+};
+
+export type TeraxGhosttyKittyPlacement = {
+  readonly image: TeraxGhosttyKittyImage;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly width: number;
+  readonly height: number;
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+};
 
 export type TeraxGhosttyInstantiate = (
   module: WebAssembly.Module,
@@ -362,6 +386,9 @@ export type TeraxGhosttyWasmExports = WebAssembly.Exports & {
   readonly restty_link_buffer_ptr: (handle: number) => number;
   readonly restty_link_count: (handle: number) => number;
   readonly restty_link_buffer_len: (handle: number) => number;
+  readonly restty_kitty_placement_stride: () => number;
+  readonly restty_kitty_placement_count: (handle: number) => number;
+  readonly restty_kitty_placements_ptr: (handle: number) => number;
 };
 
 export type TypedArray =

@@ -40,6 +40,9 @@ export type {
   TeraxGhosttySearchStatus,
   TeraxGhosttySearchViewportSpan,
   TeraxGhosttySelection,
-  TeraxGhosttyTerminalOptions,
+  TeraxGhosttyKittyImage,
+  TeraxGhosttyKittyImageFormat,
+  TeraxGhosttyKittyPlacement,
   TeraxGhosttyTerminalResourceStats,
+  TeraxGhosttyTerminalOptions,
 } from "./types";
