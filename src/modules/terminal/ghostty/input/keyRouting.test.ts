@@ -156,6 +156,18 @@ describe("ignoredForIme", () => {
     [{ key: " ", keyCode: 229, ctrlKey: true }, false, true],
     [{ key: "e", keyCode: 229, ctrlKey: true, altKey: true }, false, true],
     [{}, false, false],
+    // An enabled Windows IME tags every key, chords included. Reading those
+    // tags as "the IME owns this key" swallowed Ctrl+A, Ctrl+E and Ctrl+K in a
+    // running program, so a Ctrl or Command chord always reaches the shell.
+    [{ key: "Process", keyCode: 229, ctrlKey: true }, false, false],
+    [{ key: "Unidentified", ctrlKey: true }, false, false],
+    [{ ctrlKey: true, isComposing: true }, false, false],
+    [{ key: "a", keyCode: 229, ctrlKey: true, isComposing: true }, false, false],
+    [{ key: "a", keyCode: 229, metaKey: true }, false, false],
+    // Ctrl+Space toggles the IME and Ctrl+Alt is AltGr text, so they stay with it.
+    [{ key: "Process", keyCode: 229, ctrlKey: true, altKey: true }, false, true],
+    // A composition in progress still owns the keyboard, chords included.
+    [{ key: "Process", keyCode: 229, ctrlKey: true }, true, true],
   ])("%j (composing %s) -> ignored %s", (over, composing, ignored) => {
     expect(ignoredForIme(press(over), ctx(composing))).toBe(ignored);
   });

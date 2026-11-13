@@ -3,6 +3,7 @@ import type { TerminalMouse } from "@/modules/terminal/ghostty/input/TerminalMou
 import { TerminalInputProxy } from "@/modules/terminal/ghostty/input/TerminalInputProxy";
 import { TerminalNativeSelection } from "@/modules/terminal/ghostty/input/TerminalNativeSelection";
 import { readTerminalClipboard } from "@/modules/terminal/lib/terminalClipboard";
+import { terminalDiagnosticsEnabled } from "@/modules/terminal/lib/terminalDiagnosticsEnabled";
 import { Key, KeyAction, type KeyEvent } from "@terax/ghostty-core/protocol";
 import type { GhosttyTerminalModelApi } from "../GhosttyTerminalModel";
 import {
@@ -59,6 +60,8 @@ export type GhosttyInputControllerOptions = {
 export class GhosttyInputController {
   private readonly encoder = new TextEncoder();
   private readonly isMac: boolean;
+  /** `terax:terminal-diagnostics`: name the modified keys nothing was sent for. */
+  private readonly traceKeys = terminalDiagnosticsEnabled();
   private readonly proxy: TerminalInputProxy;
   private imeAnchor: ImeAnchor | null = null;
   private mouse: TerminalMouse | null = null;
@@ -219,7 +222,17 @@ export class GhosttyInputController {
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     this.nativeSelection?.reset();
     this.trackOptionKeys(event, true);
-    if (ignoredForIme(event, this.keyContext)) return;
+    if (ignoredForIme(event, this.keyContext)) {
+      this.traceDropped(
+        event,
+        event.defaultPrevented
+          ? "already-handled"
+          : this.composing
+            ? "composing"
+            : "ime",
+      );
+      return;
+    }
 
     let route = routeKeyDown(event, this.keyContext);
     if (route.kind === "paste") {
@@ -262,13 +275,43 @@ export class GhosttyInputController {
           consume(event);
           this.options.model.scrollToBottom();
           this.options.onData(encoded);
+        } else {
+          this.traceDropped(event, "unencoded");
         }
         return;
       }
       default:
+        this.traceDropped(event, "unrouted");
         return;
     }
   };
+
+  /**
+   * A modified key that produced no bytes is the hard kind of report to chase
+   * ("Ctrl+A does nothing here"); with `terax:terminal-diagnostics` set, say
+   * which key the terminal gave up on and why. Plain typing is never traced,
+   * so a composing IME stays quiet.
+   */
+  private traceDropped(event: KeyboardEvent, reason: string): void {
+    if (!this.traceKeys) return;
+    if (!event.ctrlKey && !event.altKey && !event.metaKey) return;
+    console.debug(
+      `[terax] key dropped (${reason})`,
+      JSON.stringify({
+        key: event.key,
+        code: event.code,
+        keyCode: event.keyCode,
+        ctrl: event.ctrlKey,
+        alt: event.altKey,
+        shift: event.shiftKey,
+        meta: event.metaKey,
+        isComposing: event.isComposing,
+        composing: this.composing,
+        defaultPrevented: event.defaultPrevented,
+        kittyFlags: this.kittyFlags(),
+      }),
+    );
+  }
 
   private pasteFromClipboard(
     event: KeyboardEvent,

@@ -103,26 +103,36 @@ function isOptionMeta(event: KeyboardLike, ctx: KeyContext): boolean {
 }
 
 /**
- * The event belongs to the IME, the webview or an earlier handler. Dead keys
- * and `Process` are the IME's; keyCode 229 is the IME's only for the keys that
- * can commit or edit text (see {@link IME_SAFE_KEY}).
+ * A Ctrl or Command chord. Ctrl+Space toggles the IME and Ctrl+Alt is AltGr
+ * text on Windows, so neither counts; no IME ever composes a chord.
+ */
+function isChord(event: KeyboardLike): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key !== " ";
+}
+
+/**
+ * The event belongs to the IME, the webview or an earlier handler. A
+ * composition in progress owns the keyboard. Dead keys and `Process` are the
+ * IME's, and keyCode 229 is the IME's only for the keys that can commit or
+ * edit text (see {@link IME_SAFE_KEY}); a Ctrl or Command chord is never the
+ * IME's: a Windows IME left enabled tags every key of the keyboard, chords
+ * included, so reading those tags as "IME" drops Ctrl+A, Ctrl+E and Ctrl+K
+ * before the shell ever sees them.
  */
 export function ignoredForIme(event: KeyboardLike, ctx: KeyContext): boolean {
-  if (event.defaultPrevented || ctx.composing() || event.isComposing)
-    return true;
+  if (event.defaultPrevented || ctx.composing()) return true;
+  if (isChord(event)) return false;
+  if (event.isComposing) return true;
   const { key } = event;
   if (key === "Process" || key === "Unidentified") return true;
   if (isOptionMeta(event, ctx)) return false;
   if (key === "Dead") return true;
   if (event.keyCode !== 229) return false;
-  // Backspace edits a preedit, but Option/Ctrl/Command+Backspace never does,
-  // and neither does a Ctrl or Command chord (Ctrl+Space toggles the IME and
-  // Ctrl+Alt is AltGr text, so those stay with it).
+  // Backspace edits a preedit, but Option/Ctrl/Command+Backspace never does
+  // (chords were already let through above).
   const wordDelete =
     key === "Backspace" && (event.altKey || event.ctrlKey || event.metaKey);
-  const chord =
-    (event.ctrlKey || event.metaKey) && !event.altKey && key !== " ";
-  return !IME_SAFE_KEY.test(key) && !wordDelete && !chord;
+  return !IME_SAFE_KEY.test(key) && !wordDelete;
 }
 
 /** Classifies a key press the IME guard let through. */
