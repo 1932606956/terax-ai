@@ -28,7 +28,12 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePeekStore } from "./lib/peekStore";
+import {
+  peekArea,
+  type PeekArea,
+  type PeekTab,
+  usePeekStore,
+} from "./lib/peekStore";
 import { PeekEditor } from "./PeekEditor";
 
 const MIN_WIDTH_PCT = 20;
@@ -50,21 +55,45 @@ function basename(path: string): string {
   return i < 0 ? path : path.slice(i + 1);
 }
 
+/** Every peek tab of every workspace tab, in one pass: editors stay mounted. */
+function allTabs(areas: Record<string, PeekArea>): PeekTab[] {
+  const out: PeekTab[] = [];
+  for (const area of Object.values(areas)) out.push(...area.tabs);
+  return out;
+}
+
+/** Peek tab ids are unique across scopes, so a dirty confirmation can look one up. */
+function findTab(
+  areas: Record<string, PeekArea>,
+  id: string,
+): PeekTab | undefined {
+  for (const area of Object.values(areas)) {
+    const tab = area.tabs.find((t) => t.id === id);
+    if (tab) return tab;
+  }
+  return undefined;
+}
+
 type Props = {
-  activeSpaceId: string | null;
+  /**
+   * Scope id of the workspace tab on screen. Peek cards belong to the tab that
+   * opened them, so only this scope's card is drawn.
+   */
+  scopeId: string | null;
 };
 
 /**
  * Peek card area: a sibling overlay of WorkspaceSurface with its own mini
- * tab strip and editors. Never promotes files into the top tab bar.
+ * tab strip and editors. Never promotes files into the top tab bar. Each
+ * workspace tab owns its card, and switching tabs swaps the card with it; the
+ * buffers of hidden scopes stay mounted so switching back keeps unsaved edits.
  */
-export function PeekTabs({ activeSpaceId }: Props) {
-  const tabs = usePeekStore((s) => s.tabs);
-  const activeId = usePeekStore((s) => s.activeId);
-  const storeActiveSpaceId = usePeekStore((s) => s.activeSpaceId);
+export function PeekTabs({ scopeId }: Props) {
+  const areas = usePeekStore((s) => s.areas);
   const setActive = usePeekStore((s) => s.setActive);
   const close = usePeekStore((s) => s.close);
   const forceClose = usePeekStore((s) => s.forceClose);
+  const forceCloseOthers = usePeekStore((s) => s.forceCloseOthers);
   const clear = usePeekStore((s) => s.clear);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -72,16 +101,12 @@ export function PeekTabs({ activeSpaceId }: Props) {
   // Expanded over the whole workspace row; drag-resize pauses while maximized.
   const [maximized, setMaximized] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [confirmAll, setConfirmAll] = useState(false);
-  const [confirmOthersId, setConfirmOthersId] = useState<string | null>(null);
+  const [confirmAllScope, setConfirmAllScope] = useState<string | null>(null);
+  const [confirmOthers, setConfirmOthers] = useState<{
+    scopeId: string;
+    id: string;
+  } | null>(null);
   const draggingRef = useRef(false);
-
-  // A peek area left over from a previous space must not linger over the
-  useEffect(() => {
-    if (storeActiveSpaceId != null && storeActiveSpaceId !== activeSpaceId) {
-      clear();
-    }
-  }, [storeActiveSpaceId, activeSpaceId, clear]);
 
   // Right-edge drag handle: window-level tracking. The percentage is of the
   // workspace row, so the terminal beside the card keeps the remaining width
@@ -121,37 +146,43 @@ export function PeekTabs({ activeSpaceId }: Props) {
     },
     [close],
   );
-  const requestCloseAll = useCallback(() => {
-    if (!usePeekStore.getState().closeAll()) setConfirmAll(true);
+  const requestCloseAll = useCallback((scope: string) => {
+    if (!usePeekStore.getState().closeAll(scope)) setConfirmAllScope(scope);
   }, []);
 
-  const requestCloseOthers = useCallback((id: string) => {
-    if (!usePeekStore.getState().closeOthers(id)) setConfirmOthersId(id);
+  const requestCloseOthers = useCallback((scope: string, id: string) => {
+    if (!usePeekStore.getState().closeOthers(scope, id))
+      setConfirmOthers({ scopeId: scope, id });
   }, []);
 
-  const confirmTab = usePeekStore((s) =>
-    s.tabs.find((t) => t.id === confirmId),
-  );
+  const confirmTab = confirmId === null ? undefined : findTab(areas, confirmId);
 
-  // Hidden when empty; the store collapses once the last tab closes.
-  if (tabs.length === 0) return null;
+  // The card is per workspace tab: another tab's peek tabs are not drawn, but
+  // their editors stay mounted below so their unsaved buffers survive the swap.
+  const area = peekArea(areas, scopeId);
+  const shown = area.tabs.length > 0;
 
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full shrink-0 flex-col border-r bg-card"
+      className={cn(
+        "relative h-full shrink-0 flex-col border-r bg-card",
+        shown ? "flex" : "hidden",
+      )}
       style={{ width: maximized ? "100%" : `${widthPct}%` }}
     >
       <div className="flex h-8 shrink-0 items-stretch gap-0.5 border-b px-1">
         <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
-          {tabs.map((tab) => {
-            const active = tab.id === activeId;
+          {area.tabs.map((tab) => {
+            const active = tab.id === area.activeId;
             return (
               <ContextMenu key={tab.id}>
                 <ContextMenuTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => setActive(tab.id)}
+                    onClick={() => {
+                      if (scopeId !== null) setActive(scopeId, tab.id);
+                    }}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
                         e.preventDefault();
@@ -199,13 +230,17 @@ export function PeekTabs({ activeSpaceId }: Props) {
                 <ContextMenuContent className={COMPACT_CONTENT}>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
-                    onSelect={() => requestCloseOthers(tab.id)}
+                    onSelect={() => {
+                      if (scopeId !== null) requestCloseOthers(scopeId, tab.id);
+                    }}
                   >
                     {tr("peek.closeOthers")}
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
-                    onSelect={requestCloseAll}
+                    onSelect={() => {
+                      if (scopeId !== null) requestCloseAll(scopeId);
+                    }}
                   >
                     {tr("peek.closeAll")}
                   </ContextMenuItem>
@@ -217,7 +252,9 @@ export function PeekTabs({ activeSpaceId }: Props) {
         <div className="flex shrink-0 items-center gap-0.5 self-center pr-0.5">
           <button
             type="button"
-            onClick={requestCloseAll}
+            onClick={() => {
+              if (scopeId !== null) requestCloseAll(scopeId);
+            }}
             aria-label={tr("peek.closeAll")}
             title={tr("peek.closeAll")}
             className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -241,11 +278,13 @@ export function PeekTabs({ activeSpaceId }: Props) {
       </div>
 
       <div className="relative min-h-0 flex-1">
-        {tabs.map((tab) => (
+        {allTabs(areas).map((tab) => (
           <PeekEditor
             key={tab.id}
             tab={tab}
-            visible={tab.id === activeId}
+            // Ids are unique across scopes, so only the active card's active
+            // tab matches; the rest stay mounted but hidden.
+            visible={tab.id === area.activeId}
             onConfirmClose={requestClose}
           />
         ))}
@@ -262,12 +301,16 @@ export function PeekTabs({ activeSpaceId }: Props) {
       )}
 
       <AlertDialog
-        open={confirmId !== null || confirmAll || confirmOthersId !== null}
+        open={
+          confirmId !== null ||
+          confirmAllScope !== null ||
+          confirmOthers !== null
+        }
         onOpenChange={(openState) => {
           if (!openState) {
             setConfirmId(null);
-            setConfirmAll(false);
-            setConfirmOthersId(null);
+            setConfirmAllScope(null);
+            setConfirmOthers(null);
           }
         }}
       >
@@ -275,7 +318,7 @@ export function PeekTabs({ activeSpaceId }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>{tr("peek.dirtyTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAll || confirmOthersId !== null
+              {confirmAllScope !== null || confirmOthers !== null
                 ? tr("peek.dirtyBodyAll")
                 : tr(
                     "peek.dirtyBody",
@@ -287,17 +330,14 @@ export function PeekTabs({ activeSpaceId }: Props) {
             <AlertDialogCancel>{tr("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (confirmAll) clear();
-                else if (confirmOthersId != null) {
+                if (confirmAllScope !== null) clear(confirmAllScope);
+                else if (confirmOthers !== null)
                   // Confirmed: drop every tab except the kept one.
-                  usePeekStore.setState((s) => ({
-                    tabs: s.tabs.filter((t) => t.id === confirmOthersId),
-                    activeId: confirmOthersId,
-                  }));
-                } else if (confirmId != null) forceClose(confirmId);
+                  forceCloseOthers(confirmOthers.scopeId, confirmOthers.id);
+                else if (confirmId != null) forceClose(confirmId);
                 setConfirmId(null);
-                setConfirmAll(false);
-                setConfirmOthersId(null);
+                setConfirmAllScope(null);
+                setConfirmOthers(null);
               }}
             >
               {tr("peek.dirtyConfirm")}

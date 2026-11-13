@@ -381,6 +381,8 @@ export default function App() {
   const { hasComposer, keysLoaded } = useAiBootstrap();
 
   const activeTab = tabs.find((t) => t.id === activeId);
+  /** Per-tab identity shared by the AI chat, the peek card and the drafts. */
+  const activeScopeId = activeTab?.scopeId ?? null;
   const isTerminalTab = activeTab?.kind === "terminal";
   const isBlockTab = activeTerminalTab?.blocks === true;
   const isEditorTab = activeTab?.kind === "editor";
@@ -392,9 +394,15 @@ export default function App() {
   // The AI assistant follows the active tab's chat scope (one per tab), so
   // each tab keeps its own conversation, panel state and draft.
   useEffect(() => {
-    const scopeId = activeTab?.scopeId;
-    if (scopeId) useChatStore.getState().setActiveScope(scopeId);
-  }, [activeTab?.scopeId]);
+    if (activeScopeId) useChatStore.getState().setActiveScope(activeScopeId);
+  }, [activeScopeId]);
+
+  // Peek ownership is read outside render (explorer callbacks), so it follows
+  // the active tab in a ref rather than through their dependency lists.
+  const activeScopeIdRef = useRef(activeScopeId);
+  useLayoutEffect(() => {
+    activeScopeIdRef.current = activeScopeId;
+  }, [activeScopeId]);
 
   const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(
     activeTab,
@@ -421,6 +429,17 @@ export default function App() {
     [activeLeafId],
   );
 
+  // A closed tab takes its peek card with it: the card belongs to that tab and
+  // would otherwise linger, unreachable, until the app exits.
+  const dropPeekScopes = useCallback((ids: number[]) => {
+    if (ids.length === 0) return;
+    const closed = new Set(ids);
+    const store = usePeekStore.getState();
+    for (const tab of tabsRef.current) {
+      if (closed.has(tab.id)) store.dropScope(tab.scopeId);
+    }
+  }, []);
+
   const disposeTab = useCallback(
     (id: number) => {
       // Terminal-leaf-keyed maps (terminalRefs/searchAddons) are pruned by
@@ -428,9 +447,10 @@ export default function App() {
       // handles need explicit cleanup here.
       editorRefs.current.delete(id);
       previewRefs.current.delete(id);
+      dropPeekScopes([id]);
       closeTab(id);
     },
-    [closeTab],
+    [closeTab, dropPeekScopes],
   );
 
   const disposeTabs = useCallback(
@@ -440,8 +460,9 @@ export default function App() {
         editorRefs.current.delete(id);
         previewRefs.current.delete(id);
       }
+      dropPeekScopes(closedIds);
     },
-    [closeTabs],
+    [closeTabs, dropPeekScopes],
   );
 
   const disposeDeletedTabs = useCallback(
@@ -746,7 +767,8 @@ export default function App() {
         if (isMarkdownPath(path)) newMarkdownTab(path);
         else openFileTab(path, true);
       } else {
-        usePeekStore.getState().open(path, activeSpaceIdRef.current);
+        const scopeId = activeScopeIdRef.current;
+        if (scopeId) usePeekStore.getState().open(path, scopeId);
       }
     },
     [openFileTab, newMarkdownTab],
@@ -759,6 +781,8 @@ export default function App() {
       mode: "+" | "-";
       originalPath: string | null;
     }) => {
+      const scopeId = activeScopeIdRef.current;
+      if (!scopeId) return;
       usePeekStore.getState().openDiff(
         {
           kind: "working",
@@ -767,7 +791,7 @@ export default function App() {
           mode: input.mode,
           originalPath: input.originalPath,
         },
-        activeSpaceIdRef.current,
+        scopeId,
       );
     },
     [],
@@ -1653,7 +1677,7 @@ export default function App() {
                   <div className="terax-pane flex h-full min-h-0 flex-col">
                     <div className="flex min-h-0 flex-1">
                       <Suspense fallback={null}>
-                        <PeekTabs activeSpaceId={activeSpaceId} />
+                        <PeekTabs scopeId={activeScopeId} />
                       </Suspense>
                       <div className="relative min-h-0 min-w-0 flex-1">
                         <WorkspaceSurface

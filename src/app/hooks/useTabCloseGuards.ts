@@ -23,6 +23,11 @@ function confirmRunningTerminal(): boolean {
   return usePreferencesStore.getState().confirmCloseRunningTerminal;
 }
 
+/** A tab's peek card closes with it, so its unsaved files count as unsaved. */
+function ownsDirtyPeek(tab: Tab): boolean {
+  return usePeekStore.getState().scopeDirty(tab.scopeId);
+}
+
 type Params = {
   tabs: Tab[];
   activeId: number;
@@ -67,7 +72,7 @@ export function useTabCloseGuards({
       // dialog entirely so confirming it doesn't appear to silently fail.
       if (nextActiveInSpace(tabs, id) === null) return;
       const t = tabs.find((x) => x.id === id);
-      if (t?.kind === "editor" && t.dirty) {
+      if (t && ((t.kind === "editor" && t.dirty) || ownsDirtyPeek(t))) {
         setPendingCloseTab(id);
         return;
       }
@@ -89,7 +94,9 @@ export function useTabCloseGuards({
     const affected = tabsRef.current.filter((tab) => close.has(tab.id));
     return {
       dirtyIds: affected
-        .filter((tab) => tab.kind === "editor" && tab.dirty)
+        .filter(
+          (tab) => (tab.kind === "editor" && tab.dirty) || ownsDirtyPeek(tab),
+        )
         .map((tab) => tab.id),
       leafIds: affected
         .filter((tab) => tab.kind === "terminal")
